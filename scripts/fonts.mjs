@@ -14,7 +14,7 @@ const check = process.argv.includes('--check')
 
 // Every character the app can render: source text, data labels, the page shell.
 const sources = ['index.html', 'src/data/semantic.json', ...readdirSync(new URL('src/', root)).filter(f => /\.(tsx|ts)$/.test(f)).map(f => `src/${f}`)]
-const used = new Set([...sources.map(read).join('')].map(c => c.codePointAt(0)))
+const used = new Set([...sources.map(read).join('')].map(c => c.codePointAt(0)).filter(c => c >= 0x20)) // no control chars (line endings vary by checkout)
 for (let c = 0x20; c < 0x7f; c++) used.add(c) // all printable ASCII, so nothing Latin ever falls back
 
 const FACES = [
@@ -60,7 +60,7 @@ for (const [pkg, weights] of FACES) {
 
 const cssPath = new URL('src/fonts.generated.css', root)
 if (check) {
-  const stale = !existsSync(cssPath) || readFileSync(cssPath, 'utf8') !== css
+  const stale = !existsSync(cssPath) || readFileSync(cssPath, 'utf8').replace(/\r\n/g, '\n') !== css // ignore checkout line endings
   const missing = jobs.filter(j => !existsSync(new URL(j.out, root))).map(j => j.out)
   if (stale || missing.length) {
     console.error(`fonts: out of date with the on-screen text${missing.length ? ` (missing ${missing.length} files)` : ''}. Run: npm run fonts`)
