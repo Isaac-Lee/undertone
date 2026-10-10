@@ -301,7 +301,9 @@ function Revelation({ s, set }: Props) {
       {/* the note's last line is the ending; what follows arrives after a pause, not as a next step */}
       <Ending s={s}
         restart={() => { clearSession(); set(() => freshSession()) }}
-        next={() => set(x => ({ ...freshSession([...x.played, x.set], x.set), act: 'encounter', shown: 1 }))} />
+        next={() => set(x => ({ ...freshSession([...x.played, x.set], x.set), act: 'encounter', shown: 1 }))}
+        // same set, the other order, a fresh answer: the reader meets the reversal from the inside
+        reverse={() => set(x => ({ ...x, seq: x.seq === 'A' ? 'B' : 'A', act: 'encounter', shown: 1, original: null, revealed: false }))} />
     </main>
   )
   const w = setById(s.set), orders = sequences(w)
@@ -339,7 +341,7 @@ function shareText(anchor: string, option: string, url: string) {
   return [`${TITLE} | 같은 기록, 다른 순서`, '', '한 사람에 대한 짧은 기록 6개를 읽고 질문 하나에 답했어요.', mine, '당신은 어떻게 읽을까요? (약 3분)', '', url].join('\n')
 }
 
-function Ending({ s, restart, next }: { s: Session; restart: () => void; next: () => void }) {
+function Ending({ s, restart, next, reverse }: { s: Session; restart: () => void; next: () => void; reverse: () => void }) {
   const about = useRef<HTMLDialogElement>(null)
   const [status, setStatus] = useState('')
   const share = async () => {
@@ -353,12 +355,18 @@ function Ending({ s, restart, next }: { s: Session; restart: () => void; next: (
     } catch { /* dismissed share sheet, or clipboard blocked */ }
   }
   return (
-    <div className="ending row" key="ending">
-      <button className="btn btn-line" onClick={next}>다른 단어로 해보기</button>
-      <button className="btn btn-quiet" onClick={restart}>처음부터 다시</button>
-      <button className="btn btn-quiet" onClick={share}>공유하기</button>
-      <button className="btn btn-quiet" onClick={() => about.current?.showModal()}>작품에 관하여</button>
-      <span className="sys sys-dim" aria-live="polite">{status}</span>
+    <div className="ending" key="ending">
+      {/* first: ways to play again; below, smaller: everything else */}
+      <div className="row ending-main">
+        <button className="btn" onClick={reverse}>반대 순서로 다시 읽기</button>
+        <button className="btn btn-line" onClick={next}>다른 단어로 해보기</button>
+      </div>
+      <div className="row ending-links">
+        <button className="btn btn-quiet" onClick={restart}>처음부터 다시</button>
+        <button className="btn btn-quiet" onClick={share}>공유하기</button>
+        <button className="btn btn-quiet" onClick={() => about.current?.showModal()}>{TITLE}에 관하여</button>
+        <span className="sys sys-dim" aria-live="polite">{status}</span>
+      </div>
       <About ref={about} />
     </div>
   )
@@ -368,15 +376,15 @@ function About({ ref }: { ref: React.Ref<HTMLDialogElement> }) {
   return (
     <dialog ref={ref} className="about" aria-labelledby="about-title" onClick={e => { if (e.target === e.currentTarget) e.currentTarget.close() }}>
       <article className="note">
-        <p className="note-eyebrow" id="about-title">작품에 관하여</p>
+        <p className="note-eyebrow" id="about-title">{TITLE}에 관하여</p>
         <p className="note-lede">{TITLE}</p>
         <p className="note-body">
-          한 사람에 대한 같은 기록 여섯 개를, 무작위로 정해지는 두 순서 가운데 하나로 보여줍니다.
+          {TITLE}은 한 사람에 대한 같은 기록 여섯 개를, 무작위로 정해지는 두 순서 가운데 하나로 보여줍니다.
           좋게 읽히는 기록이 먼저 오는 순서와, 나쁘게 읽히는 기록이 먼저 오는 순서입니다.
           두 가지로 읽힐 수 있는 말 {SETS.length}개가 준비되어 있고, 할 때마다 아직 해보지 않은 말이 나옵니다.
         </p>
         <p className="note-body">
-          끌림 그림에서 두 묶음과 질문의 말이 끌려가는 움직임은 작품의 표현입니다.
+          끌림 그림에서 두 묶음과 질문의 말이 끌려가는 움직임은 연출입니다.
           네 답의 좌우 위치만 측정값으로, 한국어 문장 임베딩 모델(jhgan/ko-sroberta-multitask)에서 각 답이 두 묶음의 말과 얼마나 비슷한지를 비교했습니다.
         </p>
         <p className="note-body">답은 이 브라우저에만 저장되고 어디로도 보내지지 않습니다. 처음부터 다시를 누르면 지워집니다.</p>

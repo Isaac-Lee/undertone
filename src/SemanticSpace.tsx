@@ -199,7 +199,7 @@ export default function SemanticSpace({ s, set }: Props) {
             })}
           </div>
           <p className="sys sys-dim" style={{ fontSize: 13, margin: '10px 0 0' }}>
-            두 묶음과 끌려가는 움직임은 작품의 표현이고, 아래 네 답의 좌우 위치는 언어 모델이 잰 값입니다.
+            두 묶음과 끌려가는 움직임은 연출이고, 아래 네 답의 좌우 위치는 언어 모델이 잰 값입니다.
           </p>
         </div>
 
