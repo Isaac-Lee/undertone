@@ -1,26 +1,32 @@
-// Content, session model and persistence. No network: everything stays in this browser.
+// Session model and persistence. No network: everything stays in this browser.
+import setsData from './data/sets.json' with { type: 'json' }
+
+export const UNSURE = '아직 잘 모르겠다' // a valid answer with no coordinate
 
 export type SeqId = 'A' | 'B'
 export type Act = 'intro' | 'encounter' | 'judgment' | 'archive' | 'space' | 'revelation'
+export type Tone = 'a' | 'b'
 
-// tone is the artwork's own framing, used only after the revelation (overlay + labels).
-export const RECORDS = [
-  { text: '성실하다', tone: 'a' },
-  { text: '책임감 있다', tone: 'a' },
-  { text: '배려심 있다', tone: 'a' },
-  { text: '남의 말을 듣지 않는다', tone: 'b' },
-  { text: '냉정하다', tone: 'b' },
-  { text: '무례하다', tone: 'b' },
-] as const
-
-export const SEQUENCES: Record<SeqId, readonly (typeof RECORDS)[number][]> = {
-  A: RECORDS,
-  B: [...RECORDS].reverse(),
+/** One word set: a phrase that reads two ways, six records (three per reading), four answers
+ *  (two per reading, interleaved so the list never leads with one) and the diagram's two groups.
+ *  The groups and tones are the artwork's framing; only the similarities in semantic.json are measured. */
+export interface WordSet {
+  id: string
+  anchor: string
+  records: Record<Tone, string[]>
+  options: string[]
+  groups: Record<Tone, string[]>
 }
+export type Rec = { text: string; tone: Tone }
 
-// Interleaved so the option list itself does not lead with one reading.
-export const OPTIONS = ['소신이 있다', '자기 생각만 옳다고 여긴다', '원칙을 지킨다', '타협하지 못한다'] as const
-export const UNSURE = '아직 잘 모르겠다' // a valid answer with no coordinate
+export const SETS = setsData as WordSet[]
+export const setById = (id: string) => SETS.find(w => w.id === id)!
+
+/** Order A puts the 'a' (good-sounding) records first; B is the same six reversed. */
+export function sequences(w: WordSet): Record<SeqId, Rec[]> {
+  const A: Rec[] = [...w.records.a.map(text => ({ text, tone: 'a' as const })), ...w.records.b.map(text => ({ text, tone: 'b' as const }))]
+  return { A, B: [...A].reverse() }
+}
 
 export interface Judgment {
   readonly option: string
@@ -28,6 +34,8 @@ export interface Judgment {
 }
 
 export interface Session {
+  set: string // WordSet id
+  played: string[] // sets finished in this browser, so 다른 단어로 해보기 offers a new one
   seq: SeqId
   act: Act
   shown: number // records displayed so far in ACT I
@@ -37,10 +45,19 @@ export interface Session {
 
 const KEY = 'first-impression/v1'
 
-export function freshSession(): Session {
-  const forced = new URLSearchParams(location.search).get('seq')?.toUpperCase()
-  const seq: SeqId = forced === 'A' || forced === 'B' ? forced : Math.random() < 0.5 ? 'A' : 'B'
-  return { seq, act: 'intro', shown: 0, original: null, revealed: false }
+const pick = <T,>(xs: readonly T[]) => xs[Math.floor(Math.random() * xs.length)]
+
+/** A new run: a random order, and a random set not played yet (all sets again once every one has
+ *  been played, never the one just finished). ?seq=A|B and ?set=<id> force them, for testing. */
+export function freshSession(played: string[] = [], last?: string): Session {
+  const q = new URLSearchParams(location.search)
+  const forcedSeq = q.get('seq')?.toUpperCase()
+  const seq: SeqId = forcedSeq === 'A' || forcedSeq === 'B' ? forcedSeq : pick(['A', 'B'] as const)
+  const unplayed = SETS.filter(w => !played.includes(w.id) && w.id !== last)
+  const pool = unplayed.length ? unplayed : SETS.filter(w => w.id !== last)
+  const forcedSet = q.get('set')
+  const set = forcedSet && SETS.some(w => w.id === forcedSet) ? forcedSet : pick(pool).id
+  return { set, played: unplayed.length ? played : [], seq, act: 'intro', shown: 0, original: null, revealed: false }
 }
 
 export function loadSession(): Session {
@@ -63,6 +80,7 @@ const AFTER_ANSWER: readonly Act[] = ['archive', 'space', 'revelation']
 function valid(s: unknown): s is Session {
   const x = s as Session
   return !!x && (x.seq === 'A' || x.seq === 'B') && ACTS.includes(x.act) && Number.isInteger(x.shown)
+    && SETS.some(w => w.id === x.set) && Array.isArray(x.played)
     && (x.original === null || typeof x.original?.option === 'string')
     && (!AFTER_ANSWER.includes(x.act) || x.original !== null) // the later scenes need the answer
 }

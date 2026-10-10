@@ -227,13 +227,13 @@ button, input { font: inherit; color: inherit; }
 .replay-strip span { padding: 2px 0; opacity: .25; transition: opacity var(--t-slow); }
 .replay-strip span.on { opacity: 1; }
 .pin { border-left: 2px solid var(--ink); padding-left: 16px; }
-/* the answer joins the six records as the seventh */
+/* recap: the six records, then the answer they led to */
 .archive-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; color: var(--ink-sys); }
 .archive-list li { display: flex; gap: 14px; align-items: baseline; }
 .archive-list .mine-entry { margin-top: 10px; color: var(--ink); }
 
 /* ── ending ──────────────────────────────────────────────── */
-.ending { gap: 4px 20px; min-height: 44px; opacity: 0; animation: appear 2s ease 4s forwards; }
+.ending { gap: 0 20px; min-height: 44px; opacity: 0; animation: appear 2s ease 4s forwards; }
 .about { max-width: min(36em, calc(100vw - 32px)); max-height: 85svh; padding: 24px; border: 1px solid var(--line-strong); background: var(--bg); color: var(--ink); }
 .about::backdrop { background: rgb(0 0 0 / .55); }
 .about form { margin-top: 4px; }
@@ -246,7 +246,7 @@ button, input { font: inherit; color: inherit; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 @media (max-width: 760px) {
-  .note { gap: 12px; }
+  .note { gap: 10px; }
   .about { padding: 18px; max-height: 92svh; }
   .note-lede { margin-top: -8px !important; font-size: 18px; }
   .note-figure { padding: 10px 14px; gap: 6px; }

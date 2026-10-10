@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import {
-  SEQUENCES, OPTIONS, UNSURE, loadSession, saveSession, clearSession, freshSession,
-  recordOriginal, reducedMotion, back, type Session, type Judgment, type SeqId,
+  SETS, setById, sequences, UNSURE, loadSession, saveSession, clearSession, freshSession,
+  recordOriginal, reducedMotion, back, type Session, type Judgment, type Rec, type Tone,
 } from './state'
 import SemanticSpace from './SemanticSpace'
 
@@ -17,6 +17,8 @@ const STEP: Record<Session['act'], string> = {
 export default function App() {
   const [s, setS] = useState(loadSession)
   useEffect(() => saveSession(s), [s])
+  // dev only: lets browser checks jump between sets and scenes without reloading (stripped from builds)
+  if (import.meta.env.DEV) (window as unknown as { __setSession: typeof setS }).__setSession = setS
   // Move focus to each act's heading so keyboard and screen-reader users land in the new scene.
   useEffect(() => { document.querySelector<HTMLElement>('[data-focus]')?.focus() }, [s.act])
 
@@ -30,7 +32,7 @@ export default function App() {
         </span>
         <span className="id" style={{ whiteSpace: 'pre' }}>{STEP[s.act]}</span>
       </header>
-      <Scene s={s} set={setS} />
+      <Scene key={s.set} s={s} set={setS} /> {/* a new set always starts its scenes fresh */}
       <MoreBelow />
     </div>
   )
@@ -85,7 +87,7 @@ export function Said({ j }: { j: Judgment }) {
 }
 
 /** The interpretation choices; one must be picked. */
-function JudgmentForm({ onSubmit, label }: { onSubmit: (j: Judgment) => void; label: string }) {
+function JudgmentForm({ options, onSubmit, label }: { options: string[]; onSubmit: (j: Judgment) => void; label: string }) {
   const [option, setOption] = useState<string | null>(null)
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -95,7 +97,7 @@ function JudgmentForm({ onSubmit, label }: { onSubmit: (j: Judgment) => void; la
     <form onSubmit={submit} className="stack" style={{ gap: 28 }}>
       <fieldset className="choices">
         <legend className="sr-only">가장 가까운 뜻을 고르세요</legend>
-        {[...OPTIONS, UNSURE].map(o => (
+        {[...options, UNSURE].map(o => (
           <label key={o} className="choice human">
             <input type="radio" name="interp" value={o} checked={option === o} onChange={() => setOption(o)} />
             <span className={o === UNSURE ? 'unsure' : ''}>{o}</span>
@@ -139,7 +141,7 @@ function Intro({ set }: Props) {
 const DWELL = 1600 // identical minimum reading time for every record
 
 function Encounter({ s, set }: Props) {
-  const seq = SEQUENCES[s.seq]
+  const seq = sequences(setById(s.set))[s.seq]
   const done = s.shown > seq.length
   const ready = useDelay(DWELL, [s.shown])
   return (
@@ -168,14 +170,15 @@ function Encounter({ s, set }: Props) {
 
 // ── ACT II — JUDGMENT ───────────────────────────────────────
 
-function JudgmentAct({ set }: Props) {
+function JudgmentAct({ s, set }: Props) {
+  const w = setById(s.set)
   return (
     <main className="center enter" style={{ maxWidth: 620 }}>
       <div className="stack" style={{ gap: 4 }}>
-        <Heading className="human">이 사람은 고집이 세다고 합니다.</Heading>
-        <p className="human" style={{ margin: 0 }}>이 사람에게 ‘고집이 세다’는 어떤 뜻일까요?</p>
+        <Heading className="human">이 사람은 {w.anchor}고 합니다.</Heading>
+        <p className="human" style={{ margin: 0 }}>이 사람에게 ‘{w.anchor}’는 어떤 뜻일까요?</p>
       </div>
-      <JudgmentForm label="이 뜻으로 답하기" onSubmit={j => set(s => recordOriginal(s, j))} />
+      <JudgmentForm options={w.options} label="이 뜻으로 답하기" onSubmit={j => set(s => recordOriginal(s, j))} />
     </main>
   )
 }
@@ -194,20 +197,20 @@ function useTyped(full: string, start: boolean) {
 }
 
 function Archive({ s, set }: Props) {
-  // The six records were other people's words about this person; the answer joins them as the seventh.
+  // A plain recap before moving on: the six records as read, then the answer they led to.
   const j = s.original!
   const show = useDelay(1400)
   const [typed, stored] = useTyped(j.option === UNSURE ? '이 사람이 어떤지 아직 잘 모르겠다' : `이 사람은 ${j.option}`, show)
   return (
     <main className="center">
-      <Heading>당신의 답도 이 사람에 관한 기록이 되었습니다</Heading>
+      <Heading>이 기록들을 읽고, 이렇게 답했습니다</Heading>
       <ol className="sys archive-list">
-        {SEQUENCES[s.seq].map((r, i) => (
+        {sequences(setById(s.set))[s.seq].map((r, i) => (
           <li key={r.text}><span className="id">{pad(i + 1)}</span><span>{r.text}</span></li>
         ))}
         {show && (
           <li className="enter mine-entry" aria-live="polite">
-            <span className="id">07</span><span className={stored ? 'human' : 'human caret'}>{typed}</span>
+            <span className="sys sys-dim">당신의 답</span><span className={stored ? 'human' : 'human caret'}>{typed}</span>
           </li>
         )}
       </ol>
@@ -221,19 +224,19 @@ function Archive({ s, set }: Props) {
 // ── ACT III — REVELATION ────────────────────────────────────
 
 /** Group marker: hollow circle vs filled square, so the framing never relies on colour alone. */
-export function Mark({ tone }: { tone: 'a' | 'b' }) {
+export function Mark({ tone }: { tone: Tone }) {
   return <span className={`mark mark-${tone}`} aria-hidden />
 }
 
-/** The participant's own order is revealed record by record on the left; then each record crosses
- *  to the right, one at a time, landing in the reversed slot — the reversal is watched, not inferred. */
+/** The participant's own order is revealed record by record on the left; then the reversed order is
+ *  filled in from its first slot down, each record crossing over from where it sat on the left. */
 const ROW = 40 // px, matches .seq li height in styles.css
 const STEP_IN = 450 // one record of the participant's order appears
 const T_CROSS = 6 * STEP_IN + 600 // crossing starts
 const STEP_CROSS = 650, CROSS_DUR = 1000
 const REORDER_MS = T_CROSS + 5 * STEP_CROSS + CROSS_DUR // everything has landed
 
-function SeqColumn({ id, side }: { id: SeqId; side: 'left' | 'right' }) {
+function SeqColumn({ records, side }: { records: Rec[]; side: 'left' | 'right' }) {
   const mine = side === 'left'
   return (
     <div className={`seq seq-${side}` + (mine ? ' mine' : '')}>
@@ -241,11 +244,11 @@ function SeqColumn({ id, side }: { id: SeqId; side: 'left' | 'right' }) {
         <span className="tag">{mine ? '당신이 받은 순서' : '반대 순서'}</span>
       </h3>
       <ol className="sys">
-        {SEQUENCES[id].map((r, j) => (
+        {records.map((r, j) => (
           <li key={r.text} className={mine ? 'enter' : 'cross'}
             style={mine ? { animationDelay: `${j * STEP_IN}ms` }
-              // right row j holds the participant's record 5-j: start beside it, then cross
-              : { '--from': `${(5 - 2 * j) * ROW}px`, animationDelay: `${T_CROSS + (5 - j) * STEP_CROSS}ms` } as React.CSSProperties}>
+              // right row j holds the participant's record 5-j: start beside it, then cross, top slot first
+              : { '--from': `${(5 - 2 * j) * ROW}px`, animationDelay: `${T_CROSS + j * STEP_CROSS}ms` } as React.CSSProperties}>
             <span className="id">{pad(j + 1)}</span><Mark tone={r.tone} /><span>{r.text}</span>
           </li>
         ))}
@@ -289,17 +292,19 @@ function Revelation({ s, set }: Props) {
       <Heading className="sr-only">순서에 관하여</Heading>
       <PrimacyNote />
       {/* the note's last line is the ending; what follows arrives after a pause, not as a next step */}
-      <Ending restart={() => { clearSession(); set(() => ({ ...freshSession(), act: 'intro' })) }} />
+      <Ending s={s}
+        restart={() => { clearSession(); set(() => freshSession()) }}
+        next={() => set(x => ({ ...freshSession([...x.played, x.set], x.set), act: 'encounter', shown: 1 }))} />
     </main>
   )
-  const other: SeqId = s.seq === 'A' ? 'B' : 'A'
+  const w = setById(s.set), orders = sequences(w)
   return (
     <main className="center" style={{ gap: 28 }}>
       <Heading>기록이 제시된 순서</Heading>
       <div className="seqs" key={run} ref={seqsRef}>
-        <SeqColumn id={s.seq} side="left" />
+        <SeqColumn records={orders[s.seq]} side="left" />
         <div aria-hidden />
-        <SeqColumn id={other} side="right" />
+        <SeqColumn records={orders[s.seq === 'A' ? 'B' : 'A']} side="right" />
       </div>
       <p key={'c' + run} className="sys enter" style={{ margin: '-12px 0 0', animationDelay: `${T_CROSS - 300}ms` }}>
         같은 기록 6개가, 다른 사람에게는 반대 순서로 제시되었습니다.<br />
@@ -310,7 +315,7 @@ function Revelation({ s, set }: Props) {
       </div>
       <div className="stack" style={{ gap: 8 }}>
         <p className="refl-lg enter" style={delay(600)}>같은 기록이 순서만 바뀌면,</p>
-        <p className="refl-lg enter" style={delay(1900)}>‘고집이 세다’는 반대쪽으로 끌려갑니다.</p>
+        <p className="refl-lg enter" style={delay(1900)}>‘{w.anchor}’는 반대쪽으로 끌려갑니다.</p>
       </div>
       <div className="enter" style={delay(3000)}><button className="btn" onClick={() => setPage(1)}>계속하기</button></div>
     </main>
@@ -319,21 +324,30 @@ function Revelation({ s, set }: Props) {
 
 // ── ENDING ──────────────────────────────────────────────────
 
-const SHARE_TEXT = '같은 기록 여섯 개. 당신은 어떤 순서로 만나게 될까요?'
+/** The message a reader sends a friend: the title line, what they did, their own reading, an invitation,
+ *  then the link on its own line so chat apps build a preview from it. The order they read is left out,
+ *  so the reversal still surprises the friend. */
+function shareText(anchor: string, option: string, url: string) {
+  const mine = option === UNSURE ? `나는 ‘${anchor}’가 무슨 뜻인지 아직 잘 모르겠어요.` : `나는 ‘${anchor}’를 ‘${option}’로 읽었어요.`
+  return [`${TITLE} | 같은 기록, 다른 순서`, '', '한 사람에 대한 짧은 기록 6개를 읽고 질문 하나에 답했어요.', mine, '당신은 어떻게 읽을까요? (약 3분)', '', url].join('\n')
+}
 
-function Ending({ restart }: { restart: () => void }) {
+function Ending({ s, restart, next }: { s: Session; restart: () => void; next: () => void }) {
   const about = useRef<HTMLDialogElement>(null)
   const [status, setStatus] = useState('')
   const share = async () => {
-    const url = location.origin + location.pathname // never the ?seq= of this visit
+    const url = location.origin + location.pathname // never the ?seq= / ?set= of this visit
+    // The link goes inside the text: apps differ in how they join a separate url to the text.
+    const text = shareText(setById(s.set).anchor, s.original!.option, url)
     try {
-      if (navigator.share) { await navigator.share({ title: TITLE, text: SHARE_TEXT, url }); return }
-      await navigator.clipboard.writeText(url)
-      setStatus('링크를 복사했습니다')
+      if (navigator.share) { await navigator.share({ title: TITLE, text }); return }
+      await navigator.clipboard.writeText(text)
+      setStatus('공유할 문구를 복사했습니다')
     } catch { /* dismissed share sheet, or clipboard blocked */ }
   }
   return (
     <div className="ending row" key="ending">
+      <button className="btn btn-line" onClick={next}>다른 단어로 해보기</button>
       <button className="btn btn-quiet" onClick={restart}>처음부터 다시</button>
       <button className="btn btn-quiet" onClick={share}>공유하기</button>
       <button className="btn btn-quiet" onClick={() => about.current?.showModal()}>작품에 관하여</button>
@@ -350,11 +364,12 @@ function About({ ref }: { ref: React.Ref<HTMLDialogElement> }) {
         <p className="note-eyebrow" id="about-title">작품에 관하여</p>
         <p className="note-lede">{TITLE}</p>
         <p className="note-body">
-          한 사람에 대한 같은 기록 여섯 개를, 방문할 때마다 무작위로 정해지는 두 순서 가운데 하나로 보여줍니다.
+          한 사람에 대한 같은 기록 여섯 개를, 무작위로 정해지는 두 순서 가운데 하나로 보여줍니다.
           좋게 읽히는 기록이 먼저 오는 순서와, 나쁘게 읽히는 기록이 먼저 오는 순서입니다.
+          두 가지로 읽힐 수 있는 말 {SETS.length}개가 준비되어 있고, 할 때마다 아직 해보지 않은 말이 나옵니다.
         </p>
         <p className="note-body">
-          끌림 그림에서 두 묶음과 ‘고집이 세다’가 끌려가는 움직임은 작품의 표현입니다.
+          끌림 그림에서 두 묶음과 질문의 말이 끌려가는 움직임은 작품의 표현입니다.
           네 답의 좌우 위치만 측정값으로, 한국어 문장 임베딩 모델(jhgan/ko-sroberta-multitask)에서 각 답이 두 묶음의 말과 얼마나 비슷한지를 비교했습니다.
         </p>
         <p className="note-body">답은 이 브라우저에만 저장되고 어디로도 보내지지 않습니다. 처음부터 다시를 누르면 지워집니다.</p>
@@ -387,8 +402,8 @@ function PrimacyNote() {
         ))}
       </figure>
       <p className="note-body">
-        같은 여섯 단어를 순서만 바꾸자, 장점이 먼저 나온 목록을 읽은 사람들이 대체로 더 호의적인 인상을 이야기했습니다.
-        먼저 읽은 단어가 틀이 되어, 뒤의 단어를 그 안에서 읽게 된다는 것입니다.
+        장점이 먼저 나온 목록을 읽은 사람들이 대체로 더 호의적인 인상을 이야기했습니다.
+        먼저 읽은 단어가 틀이 되어, 뒤의 단어를 그 안에서 읽게 된 것입니다.
       </p>
       <p className="note-foot">
         여러 사람에게서 관찰되는 경향이지, 한 사람의 한 번의 판단을 설명하는 법칙은 아닙니다. 당신의 판단이 순서 때문이었는지는 당신만 알 수 있습니다.

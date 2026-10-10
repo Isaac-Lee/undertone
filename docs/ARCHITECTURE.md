@@ -21,6 +21,8 @@ later step without an answer) and starts fresh; a save from the removed fifth st
 
 | field | meaning |
 |---|---|
+| `set` | the word set's id (`src/data/sets.json`). Random among sets not yet played, or `?set=` |
+| `played` | sets finished in this browser; 다른 단어로 해보기 picks outside it, and it resets once all are played |
 | `seq` | `'A'` or `'B'`. Picked at random once (or set by `?seq=` on a fresh session) |
 | `act` | current scene |
 | `shown` | how many records have been displayed in step 1 |

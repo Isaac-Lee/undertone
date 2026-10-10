@@ -13,7 +13,7 @@ const read = p => readFileSync(new URL(p, root), 'utf8')
 const check = process.argv.includes('--check')
 
 // Every character the app can render: source text, data labels, the page shell.
-const sources = ['index.html', 'src/data/semantic.json', ...readdirSync(new URL('src/', root)).filter(f => /\.(tsx|ts)$/.test(f)).map(f => `src/${f}`)]
+const sources = ['index.html', 'src/data/semantic.json', 'src/data/sets.json', ...readdirSync(new URL('src/', root)).filter(f => /\.(tsx|ts)$/.test(f)).map(f => `src/${f}`)]
 const used = new Set([...sources.map(read).join('')].map(c => c.codePointAt(0)).filter(c => c >= 0x20)) // no control chars (line endings vary by checkout)
 for (let c = 0x20; c < 0x7f; c++) used.add(c) // all printable ASCII, so nothing Latin ever falls back
 

@@ -1,37 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import sem from './data/semantic.json'
-import { SEQUENCES, OPTIONS, reducedMotion, type SeqId } from './state'
+import { setById, sequences, reducedMotion, type SeqId, type Rec, type Tone } from './state'
 import { Heading, Said, Mark, type Props } from './App'
 
-// ── measured data (precomputed by scripts/embed.py, never altered here) ──
-type Group = 'anchor' | 'a' | 'b' | 'option'
-type Term = { text: string; group: Group }
-const TERMS = sem.terms as Term[]
-const IDX = new Map(TERMS.map((t, i) => [t.text, i]))
-const cos = (a: string, b: string) => sem.similarity[IDX.get(a)!][IDX.get(b)!]
-const ANCHOR = TERMS[0].text
-const CORE = TERMS.filter(t => t.group !== 'option')
-const GROUP_WORDS = { a: CORE.filter(t => t.group === 'a'), b: CORE.filter(t => t.group === 'b') }
-
-const nearest = (text: string, n = 3) =>
-  CORE.filter(t => t.text !== text).map(t => ({ text: t.text, v: cos(text, t.text) })).sort((p, q) => q.v - p.v).slice(0, n)
-
-// Plain-language reading of a cosine value. Thresholds are presentation only, chosen for this vocabulary.
+// Plain-language reading of a cosine value. Thresholds are presentation only.
 const closeness = (v: number) => (v >= 0.6 ? '매우 가까움' : v >= 0.45 ? '가까운 편' : v >= 0.3 ? '조금 떨어짐' : '먼 편')
-
-// ── measured lean: mean similarity to the a-words minus mean similarity to the b-words ──
-const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length
-const lean = (text: string) =>
-  mean(GROUP_WORDS.a.filter(t => t.text !== text).map(t => cos(text, t.text))) -
-  mean(GROUP_WORDS.b.filter(t => t.text !== text).map(t => cos(text, t.text)))
-const MID = (mean(GROUP_WORDS.a.map(t => lean(t.text))) + mean(GROUP_WORDS.b.map(t => lean(t.text)))) / 2
 
 // ── artistic parameter: earlier records weigh more in the pull. Not a measured quantity. ──
 const W = (k: number) => 1 / (k + 1)
 const W_SUM = [0, 1, 2, 3, 4, 5].reduce((s, k) => s + W(k), 0)
-function salience(seq: SeqId, upto: number) {
+function salience(order: Rec[], upto: number) {
   const s = { a: 0, b: 0 }
-  SEQUENCES[seq].slice(0, upto + 1).forEach((r, k) => { s[r.tone] += W(k) / W_SUM })
+  order.slice(0, upto + 1).forEach((r, k) => { s[r.tone] += W(k) / W_SUM })
   return s
 }
 
@@ -46,15 +26,55 @@ const SLOTS = [[40, 188], [74, 128], [64, 256], [118, 166], [126, 220]] // a sid
 const ANCHOR_Y = 52
 export const TONE_NAME = { a: '좋게 읽히는', b: '나쁘게 읽히는' } as const
 const PULL_MS = 3200 // the single pull
-const SPOT = new Map<string, [number, number]>()
-for (const g of ['a', 'b'] as const) {
-  ;[...GROUP_WORDS[g]].sort((p, q) => Math.abs(lean(q.text) - MID) - Math.abs(lean(p.text) - MID))
-    .forEach((t, k) => SPOT.set(t.text, g === 'a' ? [SLOTS[k][0], SLOTS[k][1]] : [BOX.w - SLOTS[k][0], SLOTS[k][1]]))
+const OPTION_Y = [296, 334, 362, 388] // the first gap is wider: a long second answer sits under the first
+
+type Group = 'anchor' | 'a' | 'b' | 'option'
+type Term = { text: string; group: Group }
+const SEM = sem.sets as Record<string, { terms: Term[]; similarity: number[][] }>
+
+/** Everything the diagram derives from one set's measured similarities (precomputed by scripts/embed.py,
+ *  never altered here). Computed once per set. */
+function measure(id: string) {
+  const w = setById(id), data = SEM[id]
+  const TERMS = data.terms
+  const IDX = new Map(TERMS.map((t, i) => [t.text, i]))
+  const cos = (a: string, b: string) => data.similarity[IDX.get(a)!][IDX.get(b)!]
+  const ANCHOR = w.anchor
+  const CORE = TERMS.filter(t => t.group !== 'option')
+  const GROUP_WORDS = { a: CORE.filter(t => t.group === 'a'), b: CORE.filter(t => t.group === 'b') }
+  const nearest = (text: string, n = 3) =>
+    CORE.filter(t => t.text !== text).map(t => ({ text: t.text, v: cos(text, t.text) })).sort((p, q) => q.v - p.v).slice(0, n)
+  // measured lean: mean similarity to the a-words minus mean similarity to the b-words
+  const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length
+  const lean = (text: string) =>
+    mean(GROUP_WORDS.a.filter(t => t.text !== text).map(t => cos(text, t.text))) -
+    mean(GROUP_WORDS.b.filter(t => t.text !== text).map(t => cos(text, t.text)))
+  const MID = (mean(GROUP_WORDS.a.map(t => lean(t.text))) + mean(GROUP_WORDS.b.map(t => lean(t.text)))) / 2
+  const SPOT = new Map<string, [number, number]>()
+  for (const g of ['a', 'b'] as const) {
+    ;[...GROUP_WORDS[g]].sort((p, q) => Math.abs(lean(q.text) - MID) - Math.abs(lean(p.text) - MID))
+      .forEach((t, k) => SPOT.set(t.text, g === 'a' ? [SLOTS[k][0], SLOTS[k][1]] : [BOX.w - SLOTS[k][0], SLOTS[k][1]]))
+  }
+  const OPTIONS = w.options
+  const SPAN = Math.max(...OPTIONS.map(o => Math.abs(lean(o) - MID)))
+  OPTIONS.forEach((o, k) => SPOT.set(o, [Math.round(180 - (lean(o) - MID) / SPAN * 100), OPTION_Y[k]]))
+  const side = (text: string): Tone => (SPOT.get(text)![0] < 180 ? 'a' : 'b')
+  return { TERMS, IDX, cos, ANCHOR, GROUP_WORDS, nearest, SPOT, OPTIONS, side, orders: sequences(w) }
 }
-const SPAN = Math.max(...OPTIONS.map(o => Math.abs(lean(o) - MID)))
-const OPTION_Y = [296, 334, 362, 388] // the first gap is wider: the long second answer sits under the first
-OPTIONS.forEach((o, k) => SPOT.set(o, [Math.round(180 - (lean(o) - MID) / SPAN * 100), OPTION_Y[k]]))
-const side = (text: string) => (SPOT.get(text)![0] < 180 ? 'a' : 'b')
+const MEASURED = new Map<string, ReturnType<typeof measure>>()
+const measured = (id: string) => MEASURED.get(id) ?? MEASURED.set(id, measure(id)).get(id)!
+
+// A label's centre is kept far enough from the edges for its text to fit (about one em per Hangul
+// syllable at 3.9% of the box width); the dot itself stays at its measured place.
+const textWidth = (text: string) => [...text].reduce((n, c) => n + (c === ' ' ? 0.3 : 1), 0) * 3.9 * BOX.w / 100
+const labelX = (text: string, x: number, lo = 0, hi: number = BOX.w, scale = 1) => {
+  const half = textWidth(text) * scale / 2 + 6
+  return Math.min(hi - half, Math.max(lo + half, x))
+}
+// The answers alternate sides row by row, so each answer's label stays in its own half; a label too
+// long for its half is set a little smaller. Labels in neighbouring rows then never meet.
+const HALF = BOX.w / 2 - 4
+const fitScale = (text: string) => Math.min(1, (HALF - 12) / textWidth(text))
 
 // Decorative haze around each group, seeded so it looks the same on every visit.
 function mulberry32(a: number) {
@@ -98,6 +118,7 @@ function useGlide(target: number, ms: number, run: number, start: number) {
 const pct = (x: number, y: number) => ({ left: `${x / BOX.w * 100}%`, top: `${y / BOX.h * 100}%` })
 
 export default function SemanticSpace({ s, set }: Props) {
+  const { TERMS, IDX, cos, ANCHOR, GROUP_WORDS, nearest, SPOT, OPTIONS, side, orders } = measured(s.set)
   const [sel, setSel] = useState(ANCHOR)
   const [open, setOpen] = useState(false) // phones: the inspector is a sheet shown after a tap
   // The participant's own order plays once on arrival; either order can be replayed.
@@ -110,10 +131,10 @@ export default function SemanticSpace({ s, set }: Props) {
   const [run, setRun] = useState(0)
   const startReplay = (seq: SeqId) => { setRun(n => n + 1); setReplay({ seq, i: reducedMotion() ? 5 : -1 }) }
 
-  const sal = replay.i < 0 ? { a: 0, b: 0 } : salience(replay.seq, replay.i)
+  const sal = replay.i < 0 ? { a: 0, b: 0 } : salience(orders[replay.seq], replay.i)
   // The groups light record by record, but the phrase is pulled once: one slow glide to where the whole
   // order leaves it, starting with the first record.
-  const end = replay.i < 0 ? { a: 0, b: 0 } : salience(replay.seq, 5)
+  const end = replay.i < 0 ? { a: 0, b: 0 } : salience(orders[replay.seq], 5)
   const pull = end.a - end.b // > 0 pulls toward a (left)
   const anchorX = useGlide(180 - pull * 110, PULL_MS, run, 180) // one value drives the label and both lines
   const answer = OPTIONS.find(o => o === s.original!.option)
@@ -121,7 +142,7 @@ export default function SemanticSpace({ s, set }: Props) {
   // Its space is held from the start, so nothing jumps; once shown it stays for replays.
   const [told, setTold] = useState(reducedMotion())
   useEffect(() => { if (replay.i >= 2) setTold(true) }, [replay.i])
-  const firstTone = SEQUENCES[s.seq][0].tone
+  const firstTone = orders[s.seq][0].tone
 
   const term = (text: string, cls: string, style: React.CSSProperties) => (
     <button key={text} className={`term ${cls}` + (sel === text ? ' sel' : '')} style={style}
@@ -164,13 +185,15 @@ export default function SemanticSpace({ s, set }: Props) {
             {term(ANCHOR, 'anchor', { ...pct(anchorX, ANCHOR_Y), transform: 'translate(-50%, -50%)' })}
             {(['a', 'b'] as const).flatMap(g => GROUP_WORDS[g].map(t => {
               const [x, y] = SPOT.get(t.text)!
-              return term(t.text, sal[g] < 0.3 ? 'dim' : '', { ...pct(x, y), transform: 'translate(-50%, -125%)' })
+              return term(t.text, sal[g] < 0.3 ? 'dim' : '', { ...pct(labelX(t.text, x), y), transform: 'translate(-50%, -125%)' })
             }))}
             {OPTIONS.map(o => {
               const [x, y] = SPOT.get(o)!
               const lit = Math.min(1, Math.max(0, (side(o) === 'a' ? pull : -pull) * 2))
+              const k = fitScale(o), a = side(o) === 'a'
+              const lx = a ? labelX(o, x, 0, HALF, k) : labelX(o, x, BOX.w - HALF, BOX.w, k)
               return term(o, o === answer ? 'human-label' : '', {
-                ...pct(x, y), transform: o === answer ? 'translate(-50%, calc(-100% - .75em))' : 'translate(-50%, -115%)', // clear the answer's ring
+                ...pct(lx, y), fontSize: k < 1 ? `max(10px, ${(3.9 * k).toFixed(2)}cqi)` : undefined, transform: o === answer ? 'translate(-50%, calc(-100% - .75em))' : 'translate(-50%, -115%)', // clear the answer's ring
                 opacity: o === answer ? 1 : 0.6 + 0.4 * lit, transition: `opacity ${PULL_MS}ms`, // far side recedes, stays readable
               })
             })}
@@ -199,7 +222,7 @@ export default function SemanticSpace({ s, set }: Props) {
               <button className="btn btn-line" onClick={() => startReplay(s.seq)}>끌림 다시 보기</button>
             </div>
             <div className="replay-strip sys m-hide" aria-live="polite">
-              {SEQUENCES[replay.seq].map((r, i) => (
+              {orders[replay.seq].map((r, i) => (
                 <span key={r.text} className={i <= replay.i ? 'on' : ''}><Mark tone={r.tone} /> {r.text}</span>
               ))}
             </div>
@@ -240,5 +263,3 @@ export default function SemanticSpace({ s, set }: Props) {
   )
 }
 
-// keep the option list and the embedded vocabulary in step (also checked by scripts/verify.ts)
-if (import.meta.env.DEV) OPTIONS.forEach(o => console.assert(IDX.has(o), `no embedding for ${o}`))
