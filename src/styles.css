@@ -82,10 +82,18 @@ button, input { font: inherit; color: inherit; }
   color: var(--ink); word-break: keep-all; text-wrap: balance;
 }
 .title {
-  font-family: var(--font-id); font-weight: 300;
-  font-size: clamp(44px, 10vw, 112px); line-height: 1; letter-spacing: -.05em;
-  color: var(--ink); margin: 0;
+  font-family: var(--font-system); font-weight: 500;
+  font-size: clamp(64px, 16vw, 132px); line-height: 1.05; letter-spacing: -.03em;
+  color: var(--ink); margin: 0 0 0 -.038em !important; /* the first syllable's side bearing, so its ink lines up with the text above */
 }
+/* intro, in the share image's language: a small line above the title, then six marks read in turn */
+.balanced { display: block; text-wrap: balance; word-break: keep-all; }
+.intro-eyebrow { margin: 0; font-size: clamp(14px, 1.8vw, 17px); color: var(--muted); }
+.reading { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
+.reading span { width: 16px; height: 16px; animation: read 5.4s var(--ease) infinite both; }
+.reading .a { border: 2px solid var(--tone-a); border-radius: 50%; }
+.reading .b { background: var(--tone-b); }
+@keyframes read { 0%, 4% { opacity: .35; } 12%, 62% { opacity: 1; } 80%, 100% { opacity: .35; } }
 
 /* HUMAN: larger, warm ink, open leading, sentence case, quoted when it is the participant's own words. */
 .human {

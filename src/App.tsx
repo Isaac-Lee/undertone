@@ -77,7 +77,7 @@ function MoreBelow() {
 // ── shared bits ─────────────────────────────────────────────
 
 export function Heading({ children, className = 'label' }: { children: React.ReactNode; className?: string }) {
-  return <h1 data-focus tabIndex={-1} className={className} style={{ margin: 0, fontWeight: 'normal' }}>{children}</h1>
+  return <h1 data-focus tabIndex={-1} className={className} style={{ margin: 0, fontWeight: className === 'title' ? undefined : 'normal' }}>{children}</h1>
 }
 
 
@@ -126,9 +126,16 @@ const pad = (n: number) => String(n).padStart(2, '0')
 function Intro({ set }: Props) {
   return (
     <main className="center enter">
-      <Heading className="title">{TITLE}</Heading>
+      <div className="stack" style={{ gap: 14 }}>
+        <p className="intro-eyebrow">한 사람에 대한 기록 여섯 개</p>
+        <Heading className="title">{TITLE}</Heading>
+        {/* six records being read one after another, in the share image's two marks. They alternate,
+            so the intro shows that records come in two kinds without hinting at either order. */}
+        <div className="reading" aria-hidden>{[0, 1, 2, 3, 4, 5].map(i => <span key={i} className={i % 2 ? 'b' : 'a'} style={{ animationDelay: `${i * 450}ms` }} />)}</div>
+      </div>
       <p className="sys" style={{ margin: 0, fontSize: 17, color: 'var(--ink)' }}>
-        한 사람에 대한 짧은 기록 6개를 하나씩 보여드립니다.<br />다 읽고 나면 질문 하나에 답하게 됩니다.
+        <span className="balanced">한 사람에 대한 짧은 기록 6개를 하나씩 보여드립니다.</span>
+        <span className="balanced">다 읽고 나면 질문 하나에 답하게 됩니다.</span>
       </p>
       <p className="sys sys-dim" style={{ margin: 0 }}>약 3분 · 소리 없음</p>
       <div><button className="btn" onClick={() => set(s => ({ ...s, act: 'encounter', shown: 1 }))}>시작하기</button></div>
