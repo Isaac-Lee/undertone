@@ -20,7 +20,7 @@ const s2 = recordOriginal(s1, { option: '자기 생각만 옳다고 여긴다', 
 assert.equal(s2.original?.option, '소신이 있다')
 
 // Going back never reaches the judgment form once a judgment exists.
-let w: Session | null = { ...s1, act: 'reflection', reflectionStep: 4, shown: 7 } as Session
+let w: Session | null = { ...s1, act: 'revelation', shown: 7 } as Session
 for (let i = 0; w && i < 20; i++) { assert.notEqual(w.act, 'judgment'); w = back(w) }
 assert.throws(() => { (s1.original as { option: string }).option = 'x' })
 

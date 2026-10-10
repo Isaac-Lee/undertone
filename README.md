@@ -1,9 +1,10 @@
-# undertone — THE FIRST IMPRESSION
+# 첫인상 (The First Impression)
 The words remain the same. What they mean does not.
 
-An interactive web artwork about primacy, interpretation and metacognition. A participant reads six
-records about PERSON_001, is asked what *“고집이 세다”* means for this person, and then finds out that
-another participant got the same six records in the opposite order.
+An interactive web artwork about primacy and interpretation, in Korean, about three minutes long. A
+reader sees six short records about one person, says what *“고집이 세다”* means for this person, watches
+that phrase get pulled toward the records they read first, and then finds out that other readers got the
+same six records in the opposite order.
 
 ## Run
 
@@ -15,120 +16,102 @@ npm install
 npm run dev
 ```
 
-Then open http://localhost:5173. Add `?seq=A` or `?seq=B` to a fresh session to force a sequence (for
-testing). Otherwise the sequence is picked at random and kept for the session.
+Then open http://localhost:5173. Add `?seq=A` or `?seq=B` to a fresh session to force an order (for
+testing). Otherwise the order is picked at random and kept for the session.
 
 ```bash
 npm run verify
 ```
 
-`verify` checks the data: both sequences hold the same records, only the order differs, the original
-judgment can't be overwritten, and every answer option has an embedding. `npm run build` type-checks
-and builds into `dist/`.
-
-To recompute the semantic space (this needs [uv](https://docs.astral.sh/uv/) and downloads the model once):
+`verify` checks the data: both orders hold the same records, only the order differs, the answer can't
+be overwritten, and every answer option has an embedding.
 
 ```bash
-uv run scripts/embed.py
+npm run build
 ```
 
-## The five acts
+`build` checks that the bundled fonts still cover every character on screen, type-checks, and writes a
+static site to `dist/`.
 
-| Act | What happens | Dominant voice |
-|---|---|---|
-| I — Encounter | Six records, one at a time. Every record gets the same treatment and the same 1.6 s minimum before NEXT RECORD is enabled. There's no auto-advance. Nothing hints that there are two orders. | system |
-| II — Judgment | “이 사람은 고집이 세다고 합니다. 이 사람에게 ‘고집이 세다’는 어떤 뜻일까요?” The four interpretations alternate between the two readings, plus *아직 잘 모르겠다*. One choice is required; there's no free-text field and no timer. The first submission is write-once. | human |
-| ↳ Archive | The participant's words stay on screen in the human voice. Below them a SYSTEM ARCHIVE record types out a verbatim copy (`CONTENT: VERBATIM`, `STATUS: STORED`). | human → system |
-| III — Revelation | Both sequences side by side, with lines joining identical records and a YOU RECEIVED tag on the participant's order. Then “당신이 읽은 정보는 같았습니다 / 달라진 것은 순서뿐입니다”, a reflection prompt, and a short note on the primacy effect (Asch, 1946) that says it can't explain this participant's judgment. | system + reflection |
-| IV — Semantic space | “고집이 세다” 주변의 말들: a fixed 3-D word cloud of the phrase and its neighbours that drifts slowly and turns on a sideways drag, with a plain-language inspector, replay of both sequences and an artistic overlay. Replay is optional and Continue is always available; Act III has already explained the swapped order. There is no second judgment: Act V's questions carry that reflection without asking for a new answer. | system + human |
-| V — Reflection | The first judgment, shown alone. Four questions, one at a time, ending on “당신의 생각은 어디에서 시작되었습니까?”. A faint RESTART fades in after about six seconds of stillness. | human |
+## Deploy
 
-## Typography: three voices
+The site is deployed on [Vercel](https://vercel.com) from `main`. `vercel.json` sets the Vite build
+(`npm run build` → `dist/`) and long-lived caching for the hashed files in `/assets`. To set it up once:
+**Add New → Project**, import this GitHub repository, and keep the detected settings. After that every
+push to `main` deploys to production, and other branches get preview URLs.
 
-Visual direction: **mechanical precision, human uncertainty** — an editorial system, not a retro/pixel one.
-Fonts follow **who is speaking**, not which screen the text is on. Tokens and classes are in `src/styles.css`.
+Link previews (KakaoTalk, Slack, X, Facebook) need an absolute URL for the share image. On Vercel the
+build reads the production address from `VERCEL_PROJECT_PRODUCTION_URL` automatically. If you add a
+custom domain, set `SITE_URL=https://your.domain` in the project's environment variables so previews use it.
 
-| Token | Class | Face(s) | Treatment |
-|---|---|---|---|
-| `--font-system` | `.sys`, `.sys-lg`, `.label` | IBM Plex Sans KR | sentence case, cool grey. Instructions, labels, buttons, Act I records (300 weight, large) |
-| `--font-id` | `.id`, `.title` | IBM Plex Mono | the only uppercase on the page: IDs, counts, status codes (PERSON_001, JUDGMENT_001, COS) |
-| `--font-human` | `.human`, `.human-quote`, `.said` | IBM Plex Sans KR | larger, warm ink, 1.85 leading, quoted. Participant words, questions to the person |
-| `--font-reflection` | `.refl`, `.refl-lg` | IBM Plex Sans KR | 2.0 leading, 34em measure, softer ink; large statements in 300 weight. Explanations, reflective statements |
-| `--font-data` | `.data` | D2Coding subset (served as “Undertone Data KR”) | Hangul-aware fixed width, only for code-like data that must keep columns: the SYSTEM ARCHIVE record |
+`dist/` is plain static files with relative paths, so it also runs from any other static host:
 
-Rules:
-- One Korean face (Plex Sans KR) for every voice, so the typeface never switches between scenes. Voices
-  differ by size, weight, leading and ink only.
-- The system pairs Plex Mono with Plex Sans KR, which come from the same family and are designed to sit together.
-- All Korean text uses `word-break: keep-all`; body copy has 1.85–2.0 leading.
-- Light by default, dark via `prefers-color-scheme`; one neutral grey family. Square corners everywhere. No em-dashes or `·` separators in visible copy.
-- There are no pixel borders, boxes or glyph icons. Group markers are a hollow circle (◦) and a filled
-  square, drawn in CSS so the framing doesn't rely on colour. Structure comes from alignment and hairlines.
+```bash
+SITE_URL=https://your.domain/path npm run build
+```
 
-Licences are all SIL OFL 1.1. IBM Plex Mono and IBM Plex Sans KR come from `@fontsource`.
-D2Coding 1.4.0 (© NAVER, OFL with Reserved Font Name) is subset to Latin + Hangul + punctuation with
-fonttools and renamed internally to “Undertone Data KR”, as the RFN requires for modified versions. The
-licence is in `public/fonts/D2Coding-OFL.txt`.
+## The four steps
+
+| Step | What happens |
+|---|---|
+| 1 — 기록 읽기 | Six records, one at a time. Every record gets the same 1.6 s minimum before 다음 기록 is enabled, with a hint to picture the person meanwhile. Nothing hints that there are two orders. |
+| 2 — 답하기 | “이 사람은 고집이 세다고 합니다. 이 사람에게 ‘고집이 세다’는 어떤 뜻일까요?” Four readings, alternating between the two senses, plus *아직 잘 모르겠다*. The answer is write-once. Then the six records are listed again and the answer types out beneath them as record 07: the reader's judgment becomes one more record about this person. |
+| 3 — 끌림 | A 2-D diagram of the two groups of meaning (좋게 / 나쁘게 읽히는 뜻). The reader's order replays: each record lights its group, and “고집이 세다” glides once toward the group read first. The four answers sit left/right by their measured lean, and one sentence says which side the reader's answer is on. Tapping a word shows its measured similarities. |
+| 4 — 순서 | The reversed order is revealed: the reader's order appears record by record, then each record crosses to its reversed slot. “같은 기록이 순서만 바뀌면, ‘고집이 세다’는 반대쪽으로 끌려갑니다.” Then the reader's answer with “처음 읽은 기록이 당신의 답에 영향을 주었을까요?”, and a note on Asch's 1946 experiment that ends the piece on “당신의 판단이 순서 때문이었는지는 당신만 알 수 있습니다.” 처음부터 다시, 공유하기 and 작품에 관하여 fade in after a pause. |
 
 ## Measured vs. represented
 
-The semantic space draws four kinds of things. There are no layer toggles on screen (the audience doesn't
-need them); this distinction lives in the code comments and here:
+The 끌림 diagram mixes data and expression, and says so under the diagram and in 작품에 관하여:
 
-- **MEASURED.** Positions and cosine similarities come from `jhgan/ko-sroberta-multitask`, a Korean
-  SBERT model (768-d, mean pooling, L2-normalised). PCA(3) is fitted on the 11 core terms only. The 4
-  answer phrases are projected into that same basis, so the map never moves. Because PCA explains
-  only 20.7% + 16.9% + 15.8% of the variance, the inspector shows the exact cosine values; the
-  intro line under the heading says positions are model-computed relations, not a measured mind. See `scripts/embed.py` → `src/data/semantic.json`.
-- **CLOUD.** The haze of particles around each word is decoration (seeded, Gaussian, the same on every
-  visit). Only the word positions themselves are measured. The drawing is centred and scaled by one
-  uniform factor, so relative distances are unchanged.
-- **FRAMING.** The two regions (◦ 소신·신념·원칙·의지·일관성 / ▪ 자기중심·막무가내·불통·완고함·융통성 없음) are the
-  artwork's own grouping, not model output. They are not drawn as outlines; they only show through the
-  overlay, and their points are told apart by shape (◦ / ▪).
-- **RESPONSE.** These are the participant's observed choices, placed at the measured position of the
-  phrase they picked. They are not a reading of their mind. *아직 잘 모르겠다* gets no
-  coordinate, and the panel says so.
-- **OVERLAY.** This is an artistic metaphor for primacy. During a replay each region glows by the
-  weight of its records, w(k) = 1/k, so earlier records weigh more. It is not a measurement, and the screen doesn't explain the
-  weighting; it is left for the participant to read as an image.
+- **Measured.** Each answer's left/right position is its *lean*: mean cosine similarity to the 좋게
+  읽히는 words minus mean similarity to the 나쁘게 읽히는 words, from `jhgan/ko-sroberta-multitask`
+  (Korean SBERT, 768-d, mean pooling, L2-normalised). The inspector shows the raw cosines.
+  See `scripts/embed.py` → `src/data/semantic.json`.
+- **Framing.** The two groups (소신·신념·원칙·의지·일관성 / 자기중심·막무가내·불통·완고함·융통성 없음) are the
+  artwork's own grouping, drawn apart on purpose with a fixed slot per word. The model's distances don't
+  flatten into 2-D without words piling up (2-D stress ≈ 0.28), so word positions within a group are
+  layout, not data.
+- **Expression.** The pull and the group glow are a metaphor for primacy: each record weighs w(k) = 1/k,
+  so earlier records weigh more. The background dots are seeded decoration.
+
+## Typography
+
+One Korean face (IBM Plex Sans KR) for every voice, with IBM Plex Mono for counts and step labels.
+Voices differ by size, weight, leading and ink only. All Korean text uses `word-break: keep-all`.
+Light and dark follow `prefers-color-scheme`. Group markers are a hollow circle and a filled square, so
+the framing never relies on colour alone.
+
+Fonts are self-hosted and cut to the characters the piece uses: `npm run fonts` takes the used slices of
+the `@fontsource` packages, subsets them with fontTools and merges each weight into one file in
+`src/fonts/` (5 files, about 110 KB in total, instead of about 760 KB across 59 slices). Run it after changing any
+on-screen text; it needs Python with `pip install "fonttools[woff]"`. The build fails if you forget.
+Licences: SIL OFL 1.1.
 
 ## Code
 
 ```
-src/state.ts          content, session model, write-once judgments, localStorage
-src/App.tsx           act switcher + Acts I, II, archive, III, V; shared Said / JudgmentForm
-src/SemanticSpace.tsx Act IV: fixed projection, layers, inspector, replay, reinterpretation
-src/styles.css        tokens, three voices, layout
-src/data/semantic.json precomputed embeddings → 3-D coords + cosine matrix
-scripts/embed.py      embedding + PCA pipeline (uv inline deps)
-scripts/verify.ts     data-integrity assertions
+src/state.ts             content, session model, write-once answer, localStorage
+src/App.tsx              steps 1, 2, 4, the ending and 작품에 관하여
+src/SemanticSpace.tsx    step 3: layout, pull, inspector
+src/styles.css           tokens, voices, layout
+src/fonts/, fonts.generated.css   subsetted fonts (generated by npm run fonts)
+src/data/semantic.json   precomputed embeddings → cosine matrix
+scripts/embed.py         embedding pipeline (uv inline deps; downloads the model once)
+scripts/fonts.mjs, subset_fonts.py   font subsetting
+scripts/verify.ts        data-integrity assertions
 ```
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the state machine and data model.
 
 ## Privacy
 
-There is no backend, no account and no analytics. The session (sequence, judgments, progress) lives
-only in this browser's `localStorage` under `first-impression/v1`, and RESTART clears it. If storage
-is blocked, the piece still runs; it just doesn't persist.
-
-## Browser verification (Chrome via the in-app browser, 2026-10-10)
-
-- ✅ Sequence A and Sequence B played in full. The records match RECORDS / reversed (also asserted in `verify`).
-- ✅ Assignment survives reloads. `?seq=` only applies to a fresh session.
-- ✅ Before judgment, the DOM never contains the other sequence or the SEQ labels.
-- ✅ The original judgment survives a reload and can't be overwritten.
-- ✅ The archive scene shows the human text in Plex Sans KR and the archived copy in the D2Coding-based data face.
-- ✅ Semantic coordinates are static data. Replaying changes only opacity and overlays, never positions.
-- ✅ Mobile at 375×812: no horizontal scroll, the space stacks above the panel, labels follow their words in 3-D, and every control is a tap target of at least 44 px.
-- ✅ Keyboard only: Tab, then arrow keys through the radio options, then Enter submits. Focus moves to each new act's heading. Plot terms are buttons.
-- ✅ No console errors or warnings in dev.
-- ⚠️ `prefers-reduced-motion` was checked in code but not emulated in the browser. Under it, CSS animations and delays collapse, the archive skips its typing animation, and replays jump to their final state.
+There is no backend, no account and no analytics. The session (order, answer, progress) lives only in
+this browser's `localStorage` under `first-impression/v1`, and 처음부터 다시 clears it. A damaged or
+outdated save starts a fresh session. If storage is blocked, the piece still runs; it just doesn't
+persist. 공유하기 shares the bare address, never the reader's order or answer.
 
 ## Limitations / next steps
 
-- There's only one PCA projection. A UMAP view, or a projection fitted with the answer phrases included, could be offered as a second, clearly labelled map.
-- The optional consented aggregate (how many A/B participants chose each reading) isn't built. It would need a small backend and a consent step.
-- Labels can overlap at some angles in the dense 소신 / 신념 / 의지 / 일관성 cluster; they separate as the cloud turns.
-- There's no sound, by design. A screen-reader pass with VoiceOver/NVDA hasn't been done; so far only the ARIA structure has been checked.
+- An optional, consented aggregate (how many readers of each order chose each reading) would make the
+  effect visible across people. It needs a small backend and a consent step, so it isn't built.
+- A screen-reader pass with VoiceOver/NVDA hasn't been done; only the ARIA structure has been checked.

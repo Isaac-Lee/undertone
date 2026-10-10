@@ -1,7 +1,7 @@
 // Content, session model and persistence. No network: everything stays in this browser.
 
 export type SeqId = 'A' | 'B'
-export type Act = 'intro' | 'encounter' | 'judgment' | 'archive' | 'revelation' | 'space' | 'reflection'
+export type Act = 'intro' | 'encounter' | 'judgment' | 'archive' | 'space' | 'revelation'
 
 // tone is the artwork's own framing, used only after the revelation (overlay + labels).
 export const RECORDS = [
@@ -33,7 +33,6 @@ export interface Session {
   shown: number // records displayed so far in ACT I
   original: Judgment | null // write-once
   revealed: boolean
-  reflectionStep: number
 }
 
 const KEY = 'first-impression/v1'
@@ -41,15 +40,31 @@ const KEY = 'first-impression/v1'
 export function freshSession(): Session {
   const forced = new URLSearchParams(location.search).get('seq')?.toUpperCase()
   const seq: SeqId = forced === 'A' || forced === 'B' ? forced : Math.random() < 0.5 ? 'A' : 'B'
-  return { seq, act: 'intro', shown: 0, original: null, revealed: false, reflectionStep: 0 }
+  return { seq, act: 'intro', shown: 0, original: null, revealed: false }
 }
 
 export function loadSession(): Session {
   try {
     const raw = localStorage.getItem(KEY)
-    if (raw) return JSON.parse(raw) as Session
+    if (raw) {
+      const s = JSON.parse(raw)
+      if (s?.act === 'reflection') s.act = 'revelation' // the former fifth step: resume at the end of the fourth
+      delete s?.reflectionStep
+      if (valid(s)) return s
+    }
   } catch { /* private mode / blocked storage: run without persistence */ }
   return freshSession()
+}
+
+const ACTS: readonly Act[] = ['intro', 'encounter', 'judgment', 'archive', 'space', 'revelation']
+const AFTER_ANSWER: readonly Act[] = ['archive', 'space', 'revelation']
+
+/** A stored session from an older or damaged save is dropped rather than half-loaded. */
+function valid(s: unknown): s is Session {
+  const x = s as Session
+  return !!x && (x.seq === 'A' || x.seq === 'B') && ACTS.includes(x.act) && Number.isInteger(x.shown)
+    && (x.original === null || typeof x.original?.option === 'string')
+    && (!AFTER_ANSWER.includes(x.act) || x.original !== null) // the later scenes need the answer
 }
 
 export function saveSession(s: Session) {
@@ -71,9 +86,8 @@ export function back(s: Session): Session | null {
   switch (s.act) {
     case 'encounter': return s.shown > 1 ? { ...s, shown: Math.min(s.shown, 7) - 1 } : { ...s, act: 'intro' }
     case 'judgment': return { ...s, act: 'encounter', shown: 7 }
-    case 'revelation': return { ...s, act: 'archive' }
-    case 'space': return { ...s, act: 'revelation' }
-    case 'reflection': return s.reflectionStep > 0 ? { ...s, reflectionStep: s.reflectionStep - 1 } : { ...s, act: 'space' }
+    case 'space': return { ...s, act: 'archive' }
+    case 'revelation': return { ...s, act: 'space' }
     default: return null // intro, archive
   }
 }

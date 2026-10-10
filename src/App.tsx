@@ -1,14 +1,17 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import {
-  SEQUENCES, OPTIONS, UNSURE, RECORDS, loadSession, saveSession, clearSession, freshSession,
+  SEQUENCES, OPTIONS, UNSURE, loadSession, saveSession, clearSession, freshSession,
   recordOriginal, reducedMotion, back, type Session, type Judgment, type SeqId,
 } from './state'
 import SemanticSpace from './SemanticSpace'
 
 export type Props = { s: Session; set: (f: (s: Session) => Session) => void }
 
-const ACT_LABEL: Record<Session['act'], string> = {
-  intro: '', encounter: 'I', judgment: 'II', archive: 'II', revelation: 'III', space: 'IV', reflection: 'V',
+export const TITLE = '첫인상'
+// Where the participant is in the piece: step number and what the step does.
+const STEP: Record<Session['act'], string> = {
+  intro: '', encounter: '1 / 4  기록 읽기', judgment: '2 / 4  답하기', archive: '2 / 4  답하기',
+  space: '3 / 4  끌림', revelation: '4 / 4  순서',
 }
 
 export default function App() {
@@ -17,18 +20,55 @@ export default function App() {
   // Move focus to each act's heading so keyboard and screen-reader users land in the new scene.
   useEffect(() => { document.querySelector<HTMLElement>('[data-focus]')?.focus() }, [s.act])
 
-  const Scene = { intro: Intro, encounter: Encounter, judgment: JudgmentAct, archive: Archive, revelation: Revelation, space: SemanticSpace, reflection: Reflection }[s.act]
+  const Scene = { intro: Intro, encounter: Encounter, judgment: JudgmentAct, archive: Archive, revelation: Revelation, space: SemanticSpace }[s.act]
   return (
     <div className="stage">
       <header className="bar">
         <span className="row" style={{ gap: 16 }}>
           {back(s) && <button className="back" onClick={() => setS(x => back(x) ?? x)}>이전</button>}
-          {s.act !== 'reflection' && <span className="id">PERSON_001</span>}
+          {s.act !== 'intro' && <span className="id">{TITLE}</span>}
         </span>
-        {s.act !== 'reflection' && <span className="id">{ACT_LABEL[s.act] && `ACT ${ACT_LABEL[s.act]}`}</span>}
+        <span className="id" style={{ whiteSpace: 'pre' }}>{STEP[s.act]}</span>
       </header>
       <Scene s={s} set={setS} />
+      <MoreBelow />
     </div>
+  )
+}
+
+/** The scrollbar is hidden, so when a screen is taller than the window, a cue at the bottom says so.
+ *  It disappears once the bottom is reached. */
+function MoreBelow() {
+  const [more, setMore] = useState(false)
+  useEffect(() => {
+    // Only what can be seen counts: space held for something not yet faded in is not "more".
+    const visibleBottom = (el: Element): number => {
+      const cs = getComputedStyle(el)
+      if (el.getAttribute('aria-hidden') === 'true' || cs.opacity === '0' || cs.visibility === 'hidden' || cs.position === 'fixed') return 0
+      const ownText = [...el.childNodes].some(n => n.nodeType === 3 && n.textContent!.trim())
+      let b = !el.children.length || ownText ? el.getBoundingClientRect().bottom : 0
+      for (const c of el.children) b = Math.max(b, visibleBottom(c))
+      return b
+    }
+    const check = () => {
+      const main = document.querySelector('main')
+      setMore(!!main && visibleBottom(main) - innerHeight > 8)
+    }
+    const ro = new ResizeObserver(check)
+    ro.observe(document.body)
+    // content swapped or revealed without a size change (a page inside a scene, a panel switched on)
+    const mo = new MutationObserver(check)
+    mo.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-hidden', 'class'] })
+    // a fade or entrance that has just finished
+    const events = ['scroll', 'resize', 'animationend', 'transitionend'] as const
+    events.forEach(e => addEventListener(e, check, { passive: true, capture: true }))
+    return () => { ro.disconnect(); mo.disconnect(); events.forEach(e => removeEventListener(e, check, { capture: true })) }
+  }, [])
+  return (
+    <button className={'more-below' + (more ? ' on' : '')} tabIndex={more ? 0 : -1} aria-hidden={!more}
+      onClick={() => scrollBy({ top: innerHeight * 0.7, behavior: 'smooth' })}>
+      아래에 더 있습니다 <span aria-hidden>↓</span>
+    </button>
   )
 }
 
@@ -40,8 +80,8 @@ export function Heading({ children, className = 'label' }: { children: React.Rea
 
 
 /** The participant's own answer, in the human voice. Never paraphrased. */
-export function Said({ j, big }: { j: Judgment; big?: boolean }) {
-  return <p className={(big ? 'human-quote' : 'human') + ' said'} style={{ margin: 0 }}>{j.option}</p>
+export function Said({ j }: { j: Judgment }) {
+  return <p className="human said" style={{ margin: 0 }}>{j.option}</p>
 }
 
 /** The interpretation choices; one must be picked. */
@@ -84,15 +124,12 @@ const pad = (n: number) => String(n).padStart(2, '0')
 function Intro({ set }: Props) {
   return (
     <main className="center enter">
-      <p className="label" style={{ margin: 0 }}>The first impression</p>
-      <Heading className="title">PERSON_001</Heading>
+      <Heading className="title">{TITLE}</Heading>
       <p className="sys" style={{ margin: 0, fontSize: 17, color: 'var(--ink)' }}>
         한 사람에 대한 짧은 기록 6개를 하나씩 보여드립니다.<br />다 읽고 나면 질문 하나에 답하게 됩니다.
       </p>
-      <div><button className="btn" onClick={() => set(s => ({ ...s, act: 'encounter', shown: 1 }))}>Begin</button></div>
-      <p className="sys sys-dim" style={{ margin: 0 }}>
-        응답은 이 브라우저에만 저장되며 어디로도 전송되지 않습니다.
-      </p>
+      <p className="sys sys-dim" style={{ margin: 0 }}>약 3분 · 소리 없음</p>
+      <div><button className="btn" onClick={() => set(s => ({ ...s, act: 'encounter', shown: 1 }))}>시작하기</button></div>
     </main>
   )
 }
@@ -107,18 +144,22 @@ function Encounter({ s, set }: Props) {
   const ready = useDelay(DWELL, [s.shown])
   return (
     <main className="center">
-      <Heading>{done ? 'Sequence complete' : `Record ${s.shown} of ${seq.length}`}</Heading>
+      <Heading>{done ? '기록 끝' : `기록 ${s.shown} / ${seq.length}`}</Heading>
       <div aria-live="polite" className="record">
         {!done && (
           <p key={s.shown} className="sys-lg enter" style={{ margin: 0 }}>{seq[s.shown - 1].text}</p>
         )}
-        {done && <p className="sys-lg enter" style={{ margin: 0, color: 'var(--muted)' }}>6 records displayed.</p>}
+        {done && <p className="sys-lg enter" style={{ margin: 0, color: 'var(--muted)' }}>기록 6개를 모두 읽었습니다.</p>}
       </div>
+      <p className="sys sys-dim" style={{ margin: 0 }}>
+        {done ? '이제 이 사람에 관한 질문에 답하게 됩니다.'
+          : ready ? '준비되면 다음 기록으로 넘어가세요.' : '이 기록이 어떤 사람을 말해 주는지 잠시 떠올려 보세요.'}
+      </p>
       <div>
         {done
-          ? <button className="btn" onClick={() => set(x => ({ ...x, act: 'judgment' }))}>Proceed</button>
+          ? <button className="btn" onClick={() => set(x => ({ ...x, act: 'judgment' }))}>질문 보기</button>
           : <button className="btn" disabled={!ready} onClick={() => set(x => ({ ...x, shown: x.shown + 1 }))}>
-              {s.shown === seq.length ? 'End of records' : 'Next record'}
+              {s.shown === seq.length ? '읽기 마치기' : '다음 기록'}
             </button>}
       </div>
     </main>
@@ -134,7 +175,7 @@ function JudgmentAct({ set }: Props) {
         <Heading className="human">이 사람은 고집이 세다고 합니다.</Heading>
         <p className="human" style={{ margin: 0 }}>이 사람에게 ‘고집이 세다’는 어떤 뜻일까요?</p>
       </div>
-      <JudgmentForm label="Record judgment" onSubmit={j => set(s => recordOriginal(s, j))} />
+      <JudgmentForm label="이 뜻으로 답하기" onSubmit={j => set(s => recordOriginal(s, j))} />
     </main>
   )
 }
@@ -153,32 +194,25 @@ function useTyped(full: string, start: boolean) {
 }
 
 function Archive({ s, set }: Props) {
+  // The six records were other people's words about this person; the answer joins them as the seventh.
   const j = s.original!
-  const show = useDelay(1800)
-  const value = `SELECTED: "${j.option}"`
-  const [typed, stored] = useTyped(value, show)
+  const show = useDelay(1400)
+  const [typed, stored] = useTyped(j.option === UNSURE ? '이 사람이 어떤지 아직 잘 모르겠다' : `이 사람은 ${j.option}`, show)
   return (
     <main className="center">
-      <Heading>Judgment recorded.</Heading>
-      <Said j={j} big />
-      {show && (
-        <section className="archive enter" aria-label="system archive">
-          <div className="id" style={{ color: 'var(--ink)' }}>SYSTEM ARCHIVE</div>
-          <dl className="data">
-            <dt>SUBJECT</dt><dd>PERSON_001</dd>
-            <dt>ENTRY</dt><dd>JUDGMENT_001</dd>
-            <dt>RECORDED</dt><dd>{j.at.replace('T', ' ').slice(0, 19)} UTC</dd>
-            <dt>VALUE</dt>
-            <dd className="value" style={{ whiteSpace: 'pre-wrap' }} aria-hidden={!stored}>
-              <span className={stored ? '' : 'caret'}>{typed}</span>
-            </dd>
-            <dt>CONTENT</dt><dd>{stored ? 'VERBATIM' : '-'}</dd>
-            <dt>STATUS</dt><dd aria-live="polite">{stored ? 'STORED' : 'WRITING'}</dd>
-          </dl>
-        </section>
-      )}
+      <Heading>당신의 답도 이 사람에 관한 기록이 되었습니다</Heading>
+      <ol className="sys archive-list">
+        {SEQUENCES[s.seq].map((r, i) => (
+          <li key={r.text}><span className="id">{pad(i + 1)}</span><span>{r.text}</span></li>
+        ))}
+        {show && (
+          <li className="enter mine-entry" aria-live="polite">
+            <span className="id">07</span><span className={stored ? 'human' : 'human caret'}>{typed}</span>
+          </li>
+        )}
+      </ol>
       <div style={{ minHeight: 44 }}>
-        {stored && <button className="btn enter" onClick={() => set(x => ({ ...x, act: 'revelation', revealed: true }))}>Continue</button>}
+        {stored && <button className="btn enter" onClick={() => set(x => ({ ...x, act: 'space' }))}>계속하기</button>}
       </div>
     </main>
   )
@@ -191,20 +225,28 @@ export function Mark({ tone }: { tone: 'a' | 'b' }) {
   return <span className={`mark mark-${tone}`} aria-hidden />
 }
 
-/** The order the participant did not receive first appears in their order, then each record
- *  travels to its own slot, so the reversal is seen happening rather than inferred. */
-const REORDER_MS = 3600
+/** The participant's own order is revealed record by record on the left; then each record crosses
+ *  to the right, one at a time, landing in the reversed slot — the reversal is watched, not inferred. */
 const ROW = 40 // px, matches .seq li height in styles.css
+const STEP_IN = 450 // one record of the participant's order appears
+const T_CROSS = 6 * STEP_IN + 600 // crossing starts
+const STEP_CROSS = 650, CROSS_DUR = 1000
+const REORDER_MS = T_CROSS + 5 * STEP_CROSS + CROSS_DUR // everything has landed
 
-export function SeqColumn({ id, mine, side }: { id: SeqId; mine: boolean; side: 'left' | 'right' }) {
+function SeqColumn({ id, side }: { id: SeqId; side: 'left' | 'right' }) {
+  const mine = side === 'left'
   return (
     <div className={`seq seq-${side}` + (mine ? ' mine' : '')}>
-      <h3><span className="id">SEQUENCE_{id}</span>{mine && <span className="tag">You received</span>}</h3>
+      <h3 className={mine ? '' : 'enter'} style={mine ? undefined : { animationDelay: `${T_CROSS - 300}ms` }}>
+        <span className="tag">{mine ? '당신이 받은 순서' : '반대 순서'}</span>
+      </h3>
       <ol className="sys">
-        {SEQUENCES[id].map((r, i) => (
-          <li key={r.text} className={mine ? '' : 'travel'}
-            style={mine ? undefined : { '--from': `${(5 - 2 * i) * ROW}px`, animationDelay: `${i * 140}ms` } as React.CSSProperties}>
-            <span className="id">{pad(i + 1)}</span><Mark tone={r.tone} /><span>{r.text}</span>
+        {SEQUENCES[id].map((r, j) => (
+          <li key={r.text} className={mine ? 'enter' : 'cross'}
+            style={mine ? { animationDelay: `${j * STEP_IN}ms` }
+              // right row j holds the participant's record 5-j: start beside it, then cross
+              : { '--from': `${(5 - 2 * j) * ROW}px`, animationDelay: `${T_CROSS + (5 - j) * STEP_CROSS}ms` } as React.CSSProperties}>
+            <span className="id">{pad(j + 1)}</span><Mark tone={r.tone} /><span>{r.text}</span>
           </li>
         ))}
       </ol>
@@ -213,93 +255,144 @@ export function SeqColumn({ id, mine, side }: { id: SeqId; mine: boolean; side: 
 }
 
 function Revelation({ s, set }: Props) {
-  const [explained, setExplained] = useState(false)
+  const [page, setPage] = useState(0) // 0 reorder · 1 your answer · 2 primacy note — one screen each, so nothing needs scrolling
   const [run, setRun] = useState(0) // bump to replay the reorder
+  useEffect(() => { if (page) document.querySelector<HTMLElement>('[data-focus]')?.focus() }, [page])
   const delay = (ms: number) => ({ animationDelay: `${ms + REORDER_MS}ms` })
   // Lines join the same record across the two orders (row i in A ↔ row 5-i in B). Each is an S-curve
   // that leaves its number horizontally, with a gap before the number and round caps.
-  const header = 54 // h3 height 44px + list margin 10px (styles.css .seq)
-  return (
+  // How far a crossing record travels sideways: from the left column's edge to its slot on the right.
+  const seqsRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const el = seqsRef.current
+    if (!el) return
+    const measure = () => {
+      const [l, r] = el.querySelectorAll('ol')
+      el.style.setProperty('--dx', `${r.getBoundingClientRect().left - l.getBoundingClientRect().right}px`)
+    }
+    measure()
+    addEventListener('resize', measure)
+    return () => removeEventListener('resize', measure)
+  }, [page, run])
+  if (page === 1) return (
     <main className="center" style={{ gap: 36 }}>
-      <Heading>Presentation order: two sequences, six records each</Heading>
-      <div className="seqs enter" key={run}>
-        <SeqColumn id="A" side="left" mine={s.seq === 'A'} />
-        <svg aria-hidden viewBox={`0 0 10 ${header + 6 * ROW}`} preserveAspectRatio="none" style={{ height: header + 6 * ROW }}>
-          {RECORDS.map((r, i) => (
-            <path key={i} className="fade-in" style={{ animationDelay: `${REORDER_MS}ms` }}
-              d={`M 1.2 ${header + ROW / 2 + i * ROW} C 4.6 ${header + ROW / 2 + i * ROW}, 5.4 ${header + ROW / 2 + (5 - i) * ROW}, 8.8 ${header + ROW / 2 + (5 - i) * ROW}`}
-              fill="none" stroke={`var(--tone-${r.tone})`} strokeOpacity={.75} strokeWidth={1.25} strokeLinecap="round"
-              vectorEffect="non-scaling-stroke" />
-          ))}
-        </svg>
-        <SeqColumn id="B" side="right" mine={s.seq === 'B'} />
-      </div>
-      <div className="enter" key={'r' + run} style={{ animationDelay: `${REORDER_MS}ms`, marginTop: -20 }}>
-        <button className="btn btn-quiet" onClick={() => setRun(n => n + 1)}>순서 다시 보기</button>
-      </div>
-      <p className="sys sys-dim enter" style={{ ...delay(0), margin: 0 }}>
-        <Mark tone="a" /> <Mark tone="b" /> 표시는 이 작품이 정한 구분입니다. 두 순서 중 어느 쪽도 기준이 아닙니다.
-      </p>
-      <div className="stack" style={{ gap: 8 }}>
-        <p className="refl-lg enter" style={delay(600)}>당신이 읽은 정보는 같았습니다.</p>
-        <p className="refl-lg enter" style={delay(1900)}>달라진 것은 순서뿐입니다.</p>
-      </div>
-      <p className="human enter" style={{ ...delay(3300), margin: 0 }}>처음 읽은 기록이 당신의 답에 영향을 주었을까요?</p>
-      <div className="pin enter stack" style={{ ...delay(3300), gap: 2 }}>
-        <span className="row" style={{ gap: 10 }}><span className="id">JUDGMENT_001</span><span className="sys sys-dim">처음의 응답</span></span>
+      <Heading className="human">처음 읽은 기록이 당신의 답에 영향을 주었을까요?</Heading>
+      <div className="pin enter stack" style={{ gap: 2 }}>
+        <span className="sys sys-dim">당신의 답</span>
         <Said j={s.original!} />
       </div>
-      {!explained
-        ? <div className="enter" style={delay(4100)}><button className="btn btn-human" onClick={() => setExplained(true)}>순서에 관하여</button></div>
-        : <PrimacyNote />}
-      {explained && <div><button className="btn" onClick={() => set(x => ({ ...x, act: 'space' }))}>말들 사이의 거리 보기</button></div>}
+      <div className="enter" style={{ animationDelay: '800ms' }}><button className="btn btn-human" onClick={() => setPage(2)}>순서에 관하여</button></div>
+    </main>
+  )
+  if (page === 2) return (
+    <main className="center" style={{ gap: 24 }}>
+      <Heading className="sr-only">순서에 관하여</Heading>
+      <PrimacyNote />
+      {/* the note's last line is the ending; what follows arrives after a pause, not as a next step */}
+      <Ending restart={() => { clearSession(); set(() => ({ ...freshSession(), act: 'intro' })) }} />
+    </main>
+  )
+  const other: SeqId = s.seq === 'A' ? 'B' : 'A'
+  return (
+    <main className="center" style={{ gap: 28 }}>
+      <Heading>기록이 제시된 순서</Heading>
+      <div className="seqs" key={run} ref={seqsRef}>
+        <SeqColumn id={s.seq} side="left" />
+        <div aria-hidden />
+        <SeqColumn id={other} side="right" />
+      </div>
+      <p key={'c' + run} className="sys enter" style={{ margin: '-12px 0 0', animationDelay: `${T_CROSS - 300}ms` }}>
+        같은 기록 6개가, 다른 사람에게는 반대 순서로 제시되었습니다.<br />
+        <span className="sys-dim"><Mark tone="a" /> 좋게 읽히는 기록 · <Mark tone="b" /> 나쁘게 읽히는 기록</span>
+      </p>
+      <div className="enter" key={'r' + run} style={{ animationDelay: `${REORDER_MS}ms`, marginTop: -12 }}>
+        <button className="btn btn-quiet" onClick={() => setRun(n => n + 1)}>순서 다시 보기</button>
+      </div>
+      <div className="stack" style={{ gap: 8 }}>
+        <p className="refl-lg enter" style={delay(600)}>같은 기록이 순서만 바뀌면,</p>
+        <p className="refl-lg enter" style={delay(1900)}>‘고집이 세다’는 반대쪽으로 끌려갑니다.</p>
+      </div>
+      <div className="enter" style={delay(3000)}><button className="btn" onClick={() => setPage(1)}>계속하기</button></div>
     </main>
   )
 }
 
-function PrimacyNote() {
+// ── ENDING ──────────────────────────────────────────────────
+
+const SHARE_TEXT = '같은 기록 여섯 개. 당신은 어떤 순서로 만나게 될까요?'
+
+function Ending({ restart }: { restart: () => void }) {
+  const about = useRef<HTMLDialogElement>(null)
+  const [status, setStatus] = useState('')
+  const share = async () => {
+    const url = location.origin + location.pathname // never the ?seq= of this visit
+    try {
+      if (navigator.share) { await navigator.share({ title: TITLE, text: SHARE_TEXT, url }); return }
+      await navigator.clipboard.writeText(url)
+      setStatus('링크를 복사했습니다')
+    } catch { /* dismissed share sheet, or clipboard blocked */ }
+  }
   return (
-    <div className="refl enter">
-      <p>먼저 접한 정보가 뒤에 오는 정보보다 인상에 더 오래, 더 크게 남는 경향을 <b>초두 효과(primacy effect)</b>라고 부릅니다.</p>
-      <p>1946년 심리학자 솔로몬 애쉬는 한 사람을 묘사하는 같은 형용사 목록을 순서만 바꾸어 보여주었습니다. 장점이 먼저 나온 목록을 읽은 사람들은 대체로 더 호의적인 인상을 이야기했습니다. 그 목록에는 ‘고집이 센’이라는 단어도 있었습니다. 먼저 읽은 단어가 일종의 틀이 되어, 뒤에 오는 단어를 그 틀 안에서 읽게 될 수 있다는 것입니다.</p>
-      <p>다만 이것은 여러 사람에게서 관찰되는 경향이지, 한 사람의 한 번의 판단을 설명하는 법칙이 아닙니다. 당신의 판단이 순서 때문이었는지, 이 화면은 알지 못합니다.</p>
+    <div className="ending row" key="ending">
+      <button className="btn btn-quiet" onClick={restart}>처음부터 다시</button>
+      <button className="btn btn-quiet" onClick={share}>공유하기</button>
+      <button className="btn btn-quiet" onClick={() => about.current?.showModal()}>작품에 관하여</button>
+      <span className="sys sys-dim" aria-live="polite">{status}</span>
+      <About ref={about} />
     </div>
   )
 }
 
-// ── ACT V — REFLECTION ──────────────────────────────────────
-
-const QUESTIONS = [
-  '당신은 언제 이 사람에 대한 판단을 내렸습니까?',
-  '나중에 읽은 정보는 처음의 판단을 바꾸었습니까?',
-  '다른 순서로 만났다면 같은 판단을 내렸을까요?',
-  '당신의 생각은 어디에서 시작되었습니까?',
-]
-
-function Reflection({ s, set }: Props) {
-  const step = s.reflectionStep
-  const last = step === QUESTIONS.length
-  const restart = () => { clearSession(); set(() => ({ ...freshSession(), act: 'intro' })) }
+function About({ ref }: { ref: React.Ref<HTMLDialogElement> }) {
   return (
-    <main className="center" style={{ gap: 40, maxWidth: 720 }}>
-      {step === 0 && (
-        <div className="stack fade-step" style={{ gap: 36 }}>
-          <Heading className="sr-only">돌아보기</Heading>
-          <div className="stack" style={{ gap: 6 }}>
-            <span className="sys sys-dim">처음의 판단</span>
-            <Said j={s.original!} big />
-          </div>
-        </div>
-      )}
-      {step > 0 && (
-        <p key={step} data-focus tabIndex={-1} className="human-quote fade-step" style={{ margin: 0 }} aria-live="polite">
-          {QUESTIONS[step - 1]}
+    <dialog ref={ref} className="about" aria-labelledby="about-title" onClick={e => { if (e.target === e.currentTarget) e.currentTarget.close() }}>
+      <article className="note">
+        <p className="note-eyebrow" id="about-title">작품에 관하여</p>
+        <p className="note-lede">{TITLE}</p>
+        <p className="note-body">
+          한 사람에 대한 같은 기록 여섯 개를, 방문할 때마다 무작위로 정해지는 두 순서 가운데 하나로 보여줍니다.
+          좋게 읽히는 기록이 먼저 오는 순서와, 나쁘게 읽히는 기록이 먼저 오는 순서입니다.
         </p>
-      )}
-      <div style={{ minHeight: 44 }}>
-        {!last && <button className="btn btn-human" onClick={() => set(x => ({ ...x, reflectionStep: x.reflectionStep + 1 }))}>계속하기</button>}
-        {last && <button className="btn btn-quiet restart" onClick={restart}>Restart</button>}
-      </div>
-    </main>
+        <p className="note-body">
+          끌림 그림에서 두 묶음과 ‘고집이 세다’가 끌려가는 움직임은 작품의 표현입니다.
+          네 답의 좌우 위치만 측정값으로, 한국어 문장 임베딩 모델(jhgan/ko-sroberta-multitask)에서 각 답이 두 묶음의 말과 얼마나 비슷한지를 비교했습니다.
+        </p>
+        <p className="note-body">답은 이 브라우저에만 저장되고 어디로도 보내지지 않습니다. 처음부터 다시를 누르면 지워집니다.</p>
+        <p className="note-foot">
+          참고 · Asch, S. E. (1946). Forming impressions of personality. <i>Journal of Abnormal and Social Psychology</i>, 41(3), 258–290.<br />
+          글꼴 · IBM Plex Sans KR, IBM Plex Mono (SIL Open Font License 1.1)
+        </p>
+        <form method="dialog"><button className="btn">닫기</button></form>
+      </article>
+    </dialog>
+  )
+}
+
+// Asch (1946): the same six traits, in one order and its reverse. Korean glosses of
+// intelligent, industrious, impulsive, critical, stubborn, envious.
+const ASCH = ['똑똑한', '근면한', '충동적인', '비판적인', '고집이 센', '질투하는']
+
+function PrimacyNote() {
+  return (
+    <article className="note enter">
+      <p className="note-eyebrow">초두 효과 · primacy effect</p>
+      <p className="note-lede">먼저 접한 정보가<br />뒤의 정보보다 인상에 더 크게 남는 경향.</p>
+      <figure className="note-figure">
+        <figcaption>1946 · 솔로몬 애쉬의 실험</figcaption>
+        {[ASCH, [...ASCH].reverse()].map((list, k) => (
+          <div key={k} className="note-row">
+            <ol>{list.map(w => <li key={w} className={w === '고집이 센' ? 'hit' : ''}>{w}</li>)}</ol>
+            <span className="note-result">{k === 0 ? '→ 더 호의적인 인상' : '→ 덜 호의적인 인상'}</span>
+          </div>
+        ))}
+      </figure>
+      <p className="note-body">
+        같은 여섯 단어를 순서만 바꾸자, 장점이 먼저 나온 목록을 읽은 사람들이 대체로 더 호의적인 인상을 이야기했습니다.
+        먼저 읽은 단어가 틀이 되어, 뒤의 단어를 그 안에서 읽게 된다는 것입니다.
+      </p>
+      <p className="note-foot">
+        여러 사람에게서 관찰되는 경향이지, 한 사람의 한 번의 판단을 설명하는 법칙은 아닙니다. 당신의 판단이 순서 때문이었는지는 당신만 알 수 있습니다.
+      </p>
+    </article>
   )
 }

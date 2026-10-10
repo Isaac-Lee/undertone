@@ -2,13 +2,27 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
-    <title>The First Impression</title>
-    <meta name="description" content="An interactive artwork about primacy and interpretation. Six records, two orders." />
+    <meta name="theme-color" content="#f2f3f1" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#141516" media="(prefers-color-scheme: dark)" />
+    <title>첫인상</title>
+    <meta name="description" content="한 사람에 대한 같은 기록 여섯 개. 어떤 순서로 만나느냐에 따라 인상은 달라질까요? 약 3분 걸리는 인터랙티브 작품." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="/src/fonts/ibm-plex-sans-kr-400.woff2" as="font" type="font/woff2" crossorigin />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ko_KR" />
+    <meta property="og:title" content="첫인상" />
+    <meta property="og:description" content="같은 기록, 다른 순서. 당신은 어떤 순서로 만나게 될까요?" />
+    <meta property="og:image" content="/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="첫인상 — 한 사람에 대한 기록 여섯 개, 두 가지 순서" />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
     <div id="root"></div>
+    <noscript>이 작품은 JavaScript가 켜져 있어야 볼 수 있습니다.</noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
