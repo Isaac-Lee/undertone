@@ -8,16 +8,13 @@
 
 /* ── tokens ─────────────────────────────────────────────── */
 :root {
-  /* Voices are chosen by speaker, not by screen.
-     SYSTEM speaks in Plex Sans KR (instructions, labels, records) and Plex Mono (IDs, numbers, data).
-     HUMAN speaks in Noto Serif KR: the brush-derived myeongjo is the one hand-made voice on the page. */
+  /* Voices are chosen by speaker, not by screen, but share one Korean face so the page never
+     switches typeface mid-flow. SYSTEM: Plex Sans KR (labels, records) + Plex Mono (IDs, data).
+     HUMAN and REFLECTION: the same Plex Sans KR, told apart by size, leading and ink. */
   --font-system: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
   --font-id: 'IBM Plex Mono', 'IBM Plex Sans KR', monospace;
-  /* Human voice never mixes faces inside one string: anything containing Hangul is set wholly in
-     Noto Serif KR (its own Latin included); Latin-only responses get Inconsolata via .latin. */
-  --font-human: 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif;
-  --font-human-latin: 'Inconsolata', ui-monospace, monospace;
-  --font-reflection: 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif;
+  --font-human: var(--font-system);
+  --font-reflection: var(--font-system);
   --font-data: 'Undertone Data KR', 'IBM Plex Mono', 'IBM Plex Sans KR', monospace; /* Korean fixed-width data only */
 
   /* one neutral grey family, light by default */
@@ -58,7 +55,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--ink); }
 body { min-height: 100svh; -webkit-font-smoothing: antialiased; font-family: var(--font-system); }
-button, input, textarea { font: inherit; color: inherit; }
+button, input { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 [data-focus]:focus { outline: none; } /* programmatic focus target, not a control */
 ::selection { background: var(--ink); color: var(--bg); }
@@ -98,9 +95,8 @@ button, input, textarea { font: inherit; color: inherit; }
 }
 .human-quote { font-family: var(--font-human); font-size: clamp(22px, 3.6vw, 32px); line-height: 1.6; color: var(--ink-human); word-break: keep-all; overflow-wrap: break-word; text-wrap: pretty; }
 .said::before { content: '“'; } .said::after { content: '”'; }
-.human.latin, .human-quote.latin, textarea.human.latin { font-family: var(--font-human-latin); }
 
-/* REFLECTION: serif, long measure limits, generous leading. */
+/* REFLECTION: long measure limits, generous leading, softer ink. */
 .refl {
   font-family: var(--font-reflection);
   font-size: clamp(16px, 2vw, 18px);
@@ -110,7 +106,7 @@ button, input, textarea { font: inherit; color: inherit; }
   word-break: keep-all;
   overflow-wrap: break-word;
 }
-.refl-lg { font-family: var(--font-reflection); font-size: clamp(24px, 4.2vw, 38px); line-height: 1.5; color: var(--ink); word-break: keep-all; margin: 0; font-weight: 400; text-wrap: balance; }
+.refl-lg { font-family: var(--font-reflection); font-size: clamp(24px, 4.2vw, 38px); line-height: 1.5; color: var(--ink); word-break: keep-all; margin: 0; font-weight: 300; letter-spacing: -.015em; text-wrap: balance; }
 
 /* ── layout ─────────────────────────────────────────────── */
 .stage {
@@ -160,14 +156,6 @@ button, input, textarea { font: inherit; color: inherit; }
 .choice:hover input { border-color: var(--ink); }
 .choice input:checked { background: var(--ink); border-color: var(--ink); box-shadow: inset 0 0 0 3px var(--bg); }
 .choice .unsure { color: var(--muted); }
-
-textarea.human {
-  width: 100%; min-height: 96px; resize: vertical;
-  background: transparent; border: 0; border-bottom: 1px solid var(--line-strong); border-radius: 0;
-  padding: 8px 0; outline: none;
-}
-textarea.human:focus-visible { border-bottom-color: var(--ink); }
-textarea.human::placeholder { color: var(--muted); }
 
 /* ── ACT I ──────────────────────────────────────────────── */
 .record { min-height: 2.6em; }

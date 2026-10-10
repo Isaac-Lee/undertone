@@ -259,8 +259,7 @@ export default function SemanticSpace({ s, set }: Props) {
           <section className="pin">
             <span className="id">JUDGMENT_001</span>
             <Said j={s.original!} />
-            {!answer && <span className="sys sys-dim">선택한 해석이 없어 이 공간에 위치하지 않습니다.</span>}
-            {s.original!.text && <span className="sys sys-dim">자유 서술은 좌표로 변환되지 않았습니다.</span>}
+            {!answer && <span className="sys sys-dim">이 답은 그림에 위치가 없습니다.</span>}
           </section>
 
           <section>
@@ -288,7 +287,7 @@ export default function SemanticSpace({ s, set }: Props) {
             <p className="sys" style={{ margin: 0 }}>
               {selT.group === 'a' || selT.group === 'b'
                 ? <><Mark tone={selT.group} /> 이 작품이 나눈 두 묶음 가운데 ‘{GROUP_WORDS[selT.group].slice(0, 2).map(t => t.text).join(', ')}’ 쪽 말</>
-                : selT.group === 'anchor' ? '모든 해석이 출발하는 표현' : '처음에 고를 수 있었던 답'}
+                : selT.group === 'anchor' ? '질문의 기준이 된 말' : '처음에 고를 수 있었던 답'}
             </p>
             <dl className="kv sys" style={{ margin: 0 }}>
               {sel !== ANCHOR && <>

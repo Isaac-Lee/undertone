@@ -23,8 +23,7 @@ export const OPTIONS = ['소신이 있다', '자기 생각만 옳다고 여긴�
 export const UNSURE = '아직 잘 모르겠다' // a valid answer with no coordinate
 
 export interface Judgment {
-  readonly option: string | null
-  readonly text: string
+  readonly option: string
   readonly at: string // ISO time
 }
 

@@ -38,32 +38,23 @@ export function Heading({ children, className = 'label' }: { children: React.Rea
   return <h1 data-focus tabIndex={-1} className={className} style={{ margin: 0, fontWeight: 'normal' }}>{children}</h1>
 }
 
-/** Latin-only text gets the Latin human face; anything with Hangul stays in one Korean face. */
-export const latin = (text: string) => (/[\u1100-\u11ff\u3130-\u318f\uac00-\ud7a3]/.test(text) ? '' : ' latin')
 
-/** The participant's own words, in the human voice. Never paraphrased. */
+/** The participant's own answer, in the human voice. Never paraphrased. */
 export function Said({ j, big }: { j: Judgment; big?: boolean }) {
-  return (
-    <div className="stack">
-      {j.option && <p className={(big ? 'human-quote' : 'human') + ' said' + latin(j.option)} style={{ margin: 0 }}>{j.option}</p>}
-      {j.text && <p className={(big ? 'human-quote' : 'human') + ' said' + latin(j.text)} style={{ margin: 0 }}>{j.text}</p>}
-    </div>
-  )
+  return <p className={(big ? 'human-quote' : 'human') + ' said'} style={{ margin: 0 }}>{j.option}</p>
 }
 
-/** The interpretation choices plus an optional free-text answer. */
+/** The interpretation choices; one must be picked. */
 function JudgmentForm({ onSubmit, label }: { onSubmit: (j: Judgment) => void; label: string }) {
   const [option, setOption] = useState<string | null>(null)
-  const [text, setText] = useState('')
-  const ok = option !== null || text.trim() !== ''
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (ok) onSubmit({ option, text: text.trim(), at: new Date().toISOString() })
+    if (option) onSubmit({ option, at: new Date().toISOString() })
   }
   return (
     <form onSubmit={submit} className="stack" style={{ gap: 28 }}>
       <fieldset className="choices">
-        <legend className="sr-only">해석을 고르십시오</legend>
+        <legend className="sr-only">가장 가까운 뜻을 고르세요</legend>
         {[...OPTIONS, UNSURE].map(o => (
           <label key={o} className="choice human">
             <input type="radio" name="interp" value={o} checked={option === o} onChange={() => setOption(o)} />
@@ -71,11 +62,7 @@ function JudgmentForm({ onSubmit, label }: { onSubmit: (j: Judgment) => void; la
           </label>
         ))}
       </fieldset>
-      <label className="stack" style={{ gap: 6 }}>
-        <span className="human">당신의 말로 이 사람을 설명해 주세요. <span className="sys sys-dim">(선택)</span></span>
-        <textarea className={'human' + (text ? latin(text) : '')} value={text} onChange={e => setText(e.target.value)} maxLength={400} placeholder="…" />
-      </label>
-      <div><button className="btn" disabled={!ok}>{label}</button></div>
+      <div><button className="btn" disabled={!option}>{label}</button></div>
     </form>
   )
 }
@@ -100,7 +87,7 @@ function Intro({ set }: Props) {
       <p className="label" style={{ margin: 0 }}>The first impression</p>
       <Heading className="title">PERSON_001</Heading>
       <p className="sys" style={{ margin: 0, fontSize: 17, color: 'var(--ink)' }}>
-        한 사람에 관한 기록 6건이 하나씩 제시됩니다.<br />기록을 읽은 뒤, 질문에 답하게 됩니다.
+        한 사람에 대한 짧은 기록 6개를 하나씩 보여드립니다.<br />다 읽고 나면 질문 하나에 답하게 됩니다.
       </p>
       <div><button className="btn" onClick={() => set(s => ({ ...s, act: 'encounter', shown: 1 }))}>Begin</button></div>
       <p className="sys sys-dim" style={{ margin: 0 }}>
@@ -145,7 +132,7 @@ function JudgmentAct({ set }: Props) {
     <main className="center enter" style={{ maxWidth: 620 }}>
       <div className="stack" style={{ gap: 4 }}>
         <Heading className="human">이 사람은 고집이 세다고 합니다.</Heading>
-        <p className="human" style={{ margin: 0 }}>당신은 이 표현을 어떻게 이해합니까?</p>
+        <p className="human" style={{ margin: 0 }}>이 사람에게 ‘고집이 세다’는 어떤 뜻일까요?</p>
       </div>
       <JudgmentForm label="Record judgment" onSubmit={j => set(s => recordOriginal(s, j))} />
     </main>
@@ -168,7 +155,7 @@ function useTyped(full: string, start: boolean) {
 function Archive({ s, set }: Props) {
   const j = s.original!
   const show = useDelay(1800)
-  const value = [j.option && `SELECTED: "${j.option}"`, j.text && `TEXT: "${j.text}"`].filter(Boolean).join('\n')
+  const value = `SELECTED: "${j.option}"`
   const [typed, stored] = useTyped(value, show)
   return (
     <main className="center">
@@ -257,7 +244,7 @@ function Revelation({ s, set }: Props) {
         <p className="refl-lg enter" style={delay(600)}>당신이 읽은 정보는 같았습니다.</p>
         <p className="refl-lg enter" style={delay(1900)}>달라진 것은 순서뿐입니다.</p>
       </div>
-      <p className="human enter" style={{ ...delay(3300), margin: 0 }}>당신이 먼저 읽은 정보는 이후의 해석에 어떤 영향을 주었을까요?</p>
+      <p className="human enter" style={{ ...delay(3300), margin: 0 }}>처음 읽은 기록이 당신의 답에 영향을 주었을까요?</p>
       <div className="pin enter stack" style={{ ...delay(3300), gap: 2 }}>
         <span className="row" style={{ gap: 10 }}><span className="id">JUDGMENT_001</span><span className="sys sys-dim">처음의 응답</span></span>
         <Said j={s.original!} />

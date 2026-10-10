@@ -21,7 +21,7 @@ second write and freeze the stored object.
 | `seq` | `'A'` or `'B'`. Picked at random once (or set by `?seq=` on a fresh session) |
 | `act` | current scene |
 | `shown` | how many records have been displayed in Act I |
-| `original` | `{ option, text, at }` for JUDGMENT_001. Immutable |
+| `original` | `{ option, at }` for JUDGMENT_001. Immutable |
 | `revealed` | true once Act III has been entered |
 | `reflectionStep` | 0–4 |
 

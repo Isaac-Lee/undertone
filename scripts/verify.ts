@@ -15,8 +15,8 @@ assert.deepEqual(b, [...a].reverse())
 
 // The original judgment is write-once.
 const s0 = { original: null, act: 'judgment' } as unknown as Session
-const s1 = recordOriginal(s0, { option: '소신이 있다', text: '', at: 't0' })
-const s2 = recordOriginal(s1, { option: '자기 생각만 옳다고 여긴다', text: 'changed', at: 't1' })
+const s1 = recordOriginal(s0, { option: '소신이 있다', at: 't0' })
+const s2 = recordOriginal(s1, { option: '자기 생각만 옳다고 여긴다', at: 't1' })
 assert.equal(s2.original?.option, '소신이 있다')
 
 // Going back never reaches the judgment form once a judgment exists.

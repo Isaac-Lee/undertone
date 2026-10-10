@@ -4,8 +4,6 @@ import '@fontsource/ibm-plex-mono/400.css'
 import '@fontsource/ibm-plex-sans-kr/300.css'
 import '@fontsource/ibm-plex-sans-kr/400.css'
 import '@fontsource/ibm-plex-sans-kr/500.css'
-import '@fontsource/inconsolata/400.css'
-import '@fontsource/noto-serif-kr/400.css'
 import './styles.css'
 import App from './App'
 
